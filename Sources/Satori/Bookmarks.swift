@@ -423,7 +423,7 @@ struct BookmarksDropdown: View {
             }
             Divider().overlay(Palette.hairline)
             VStack(spacing: 1) {
-                Foot("bookmark", "Add This Page") { browser.bookmarkCurrent() }
+                Foot("star", "Add This Page") { browser.bookmarkCurrent() }
                 Foot(nil, "Manage Bookmarks…") { browser.bookmarking = true }
             }
             .padding(6)

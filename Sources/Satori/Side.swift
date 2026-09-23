@@ -347,7 +347,7 @@ struct SideBar: View {
     private var foot: some View {
         HStack(spacing: 2) {
             ExtensionSlot(edge: .trailing)
-            Door(icon: "bookmark", help: "Bookmarks") { browser.bookmarksOpen.toggle() }
+            Door(icon: "star", help: "Bookmarks") { browser.bookmarksOpen.toggle() }
                 .popover(isPresented: $browser.bookmarksOpen, arrowEdge: .trailing) {
                     BookmarksDropdown(browser: browser, bookmarks: browser.bookmarks)
                 }

@@ -29,13 +29,18 @@ struct TabBar: View {
             ZStack(alignment: .leading) {
                 // The empty half of the strip is what you grab to move the
                 // window; the tabs keep the run they sit on.
-                DragStrip(reserved: Metrics.lights + run(in: geo.size.width) + Metrics.tabGap + Metrics.plusWidth, trailing: Metrics.helm + 26 + 24)
+                DragStrip(reserved: Metrics.lights + Metrics.helm + Metrics.tabGap + run(in: geo.size.width) + Metrics.tabGap + Metrics.plusWidth, trailing: 26 + 24)
                 // And the corner the lights sit in, which is title bar too —
                 // the one stretch left to take hold of when tabs fill the row.
                 DragStrip()
                     .frame(width: Metrics.lights)
 
                 HStack(spacing: Metrics.tabGap) {
+                    // Back, forward, reload, first thing after the lights —
+                    // where hands coming from every other browser look for them.
+                    Helm(browser: browser)
+                        .padding(.trailing, 8)
+
                     // The tabs, in a run of their own. While they fit, it is
                     // exactly as wide as they are and nothing about the row
                     // changes. Past what the window holds at their narrowest
@@ -104,13 +109,11 @@ struct TabBar: View {
 
                     Spacer(minLength: 0)
 
-                    // Back, forward, reload, and the bookmarks, at the far end
+                    // The extensions and the bookmarks, at the far end
                     // of the row. The dropdown hangs from the last one.
                     HStack(spacing: Metrics.tabGap) {
                         ExtensionSlot()
-                        Helm(browser: browser)
-                            .padding(.trailing, 8)
-                        Door(icon: "bookmark", help: "Bookmarks") { browser.bookmarksOpen.toggle() }
+                        Door(icon: "star", help: "Bookmarks") { browser.bookmarksOpen.toggle() }
                             .popover(isPresented: $browser.bookmarksOpen, arrowEdge: .bottom) {
                                 BookmarksDropdown(browser: browser, bookmarks: browser.bookmarks)
                             }
@@ -214,7 +217,7 @@ struct TabBar: View {
     /// the air around them. The doors are measured; until they have been,
     /// the three of the helm and the bookmarks stand in for them.
     private func room(in strip: CGFloat) -> CGFloat {
-        let far = doors > 0 ? doors : Metrics.helm + 26
+        let far = doors > 0 ? doors : 26
         return max(0, strip - Metrics.lights - 12 - Metrics.plusWidth - far - 3 * Metrics.tabGap)
     }
 
