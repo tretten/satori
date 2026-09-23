@@ -355,6 +355,14 @@ private struct TabPill: View {
             }
         }
         .background { ground }
+        .overlay {
+            // An open field gets a frame of its own, so the tab being typed
+            // in reads as the one thing on the row that wants the keyboard.
+            if editing {
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .strokeBorder(Palette.ink.opacity(0.3), lineWidth: 1)
+            }
+        }
         .modifier(Shake(travel: shake))
         .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         // Never both at once.
@@ -413,6 +421,16 @@ private struct TabPill: View {
     private var titled: some View {
         HStack(spacing: 6) {
             if editing {
+                // The icon stays where it was — or a globe when the page has
+                // none yet — so the tab keeps its face while it takes an address.
+                if let icon = tab.icon {
+                    Mark(icon: icon, letter: tab.monogram, size: 15, dim: tab.asleep)
+                } else {
+                    Image(systemName: "globe")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(Palette.muted)
+                        .frame(width: 15, height: 15)
+                }
                 PillField(browser: browser,
                     text: { browser.tabDraft },
                     change: { browser.tabDraft = $0 },
