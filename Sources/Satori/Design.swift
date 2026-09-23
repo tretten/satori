@@ -88,9 +88,10 @@ enum Metrics {
     /// to breathe just leaves it sitting below three buttons it used to line
     /// up with. Safari-tall: 48 points, 96 pixels on retina.
     static let strip: CGFloat = 48
-    /// The page floats on the ground with air around it.
-    static let pageInset: CGFloat = 8
-    static let pageRadius: CGFloat = 10
+    /// The page goes edge to edge; only its top corners are rounded, against
+    /// the strip.
+    static let pageInset: CGFloat = 0
+    static let pageRadius: CGFloat = 4
 
 /// A page's theme-color, parsed where it is worn. #rgb and #rrggbb; anything
 /// else is no color, and the bar stays the ground it always was. Dark colors
