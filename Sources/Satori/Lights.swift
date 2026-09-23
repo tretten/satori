@@ -17,7 +17,7 @@ final class Lights: NSObject {
     /// Where the close button's centre goes, from the window's top-left: set
     /// in tighter than a unified toolbar would, which Metrics.lights and
     /// sideLights are measured from.
-    static let centre = CGPoint(x: 26, y: 22)
+    static let centre = CGPoint(x: 30, y: 22)
 
     private static var kept: [ObjectIdentifier: Lights] = [:]
 
@@ -31,16 +31,27 @@ final class Lights: NSObject {
     private weak var window: NSWindow?
     private let moved: () -> Void
     private var placing = false
-    /// AppKit's own spacing between the three, read once from its first
-    /// layout and kept. Read again on every pass, it was caught while AppKit
-    /// was halfway through putting them back after a resize — one button
-    /// moved, the next not yet — and the three closed up from 23 points apart
-    /// to 13, on top of each other, a spacing each later pass then copied
-    /// from the one before. Reproduced with ./bench resize, 23 Sep 2026.
-    /// The sizes are kept for the same reason: a taller title bar stretches
-    /// the buttons into ovals, and every pass would copy the stretch.
+    /// AppKit's own spacing between the three, read once from its first layout
+    /// and kept. Read again on every pass, it was caught while AppKit was
+    /// halfway through putting them back after a resize — one button moved,
+    /// the next not yet — and the three closed up from 23 points apart to 13,
+    /// on top of each other, a spacing each later pass then copied from the
+    /// one before. Reproduced with ./bench resize, 23 Sep 2026.
     private let spacing: CGFloat
-    private let sizes: [NSSize]
+
+    /// The buttons' own size, read off a window AppKit laid out by itself —
+    /// never off this one, whose taller bar stretches them into ovals that
+    /// every later pass would then copy. Squared: the lights are circles.
+    private static let natural: NSSize = {
+        let probe = NSWindow(
+            contentRect: NSMakeRect(0, 0, 100, 100),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered, defer: true
+        )
+        let size = probe.standardWindowButton(.closeButton)?.frame.size
+        let side = min(size?.width ?? 12, size?.height ?? 12)
+        return NSSize(width: side, height: side)
+    }()
 
     private init(_ window: NSWindow, moved: @escaping () -> Void) {
         self.window = window
@@ -48,8 +59,6 @@ final class Lights: NSObject {
         let row = [NSWindow.ButtonType.closeButton, .miniaturizeButton].compactMap { window.standardWindowButton($0) }
         let measured = row.count == 2 ? row[1].frame.minX - row[0].frame.minX : 0
         spacing = (16...32).contains(measured) ? measured : 20
-        sizes = [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton]
-            .compactMap { window.standardWindowButton($0) }.map { $0.frame.size }
         super.init()
         let centre = NotificationCenter.default
         for name in [
@@ -95,11 +104,10 @@ final class Lights: NSObject {
             container.frame = frame
         }
         // Only the row moves; the spacing is AppKit's, from its first layout —
-        // and so are the sizes, or the taller bar stretches the three into
-        // ovals and every later pass copies the stretch.
+        // and the size is AppKit's own, so the taller bar can't stretch the
+        // three into ovals.
         for (index, button) in buttons.enumerated() {
-            var size = button.frame.size
-            if index < sizes.count { size = sizes[index] }
+            let size = Lights.natural
             let origin = NSPoint(
                 x: Lights.centre.x - size.width / 2 + CGFloat(index) * spacing,
                 y: bar.bounds.height - Lights.centre.y - size.height / 2

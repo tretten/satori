@@ -59,6 +59,22 @@ final class Bench {
         }
     }
 
+    /// Button frames, to check roundness headlessly: width and height each.
+    static func lightSize(of window: NSWindow) -> [[Int]] {
+        [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].compactMap { type in
+            guard let button = window.standardWindowButton(type) else { return nil }
+            return [Int(button.frame.width.rounded()), Int(button.frame.height.rounded())]
+        }
+    }
+
+    /// Whether the hand-drawn resting lights cover the real ones.
+    static func resting(of window: NSWindow) -> Bool {
+        guard let close = window.standardWindowButton(.closeButton),
+              let titlebar = close.superview
+        else { return false }
+        return titlebar.subviews.contains { $0 is RestingLights && !$0.isHidden }
+    }
+
     // MARK: - starting and stopping
 
     func start(for browser: Browser) {
@@ -368,7 +384,11 @@ final class Bench {
                     "frame": [Int(window.frame.minX), Int(window.frame.minY), Int(window.frame.width), Int(window.frame.height)],
                 ]
             }
-            if let window = Links.window { out["lights"] = Bench.lights(of: window) }
+            if let window = Links.window {
+                out["lights"] = Bench.lights(of: window)
+                out["lightSize"] = Bench.lightSize(of: window)
+                out["resting"] = Bench.resting(of: window)
+            }
             out["keysQuieted"] = PageView.quieted
             answer(out)
 
