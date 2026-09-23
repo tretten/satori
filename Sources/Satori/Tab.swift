@@ -83,6 +83,8 @@ final class Tab: ObservableObject, Identifiable {
     /// Set when the page never arrived — no host, no network, a refused
     /// connection. Shown in place of the page rather than in a dialog.
     @Published var failure: String?
+    /// The error behind it, for the small print under the message.
+    @Published var failureCode: String?
     /// How far down the page you are, nought to one. The tab's own pill fills
     /// with it.
     @Published var reading: Double = 0
@@ -536,6 +538,7 @@ final class Tab: ObservableObject, Identifiable {
         address = url
         title = ""
         failure = nil
+        failureCode = nil
         reading = 0
         lastY = 0
         reader = false
@@ -677,6 +680,7 @@ final class Tab: ObservableObject, Identifiable {
     func recoverFromCrash() {
         guard let address else { return }
         failure = nil
+        failureCode = nil
         loadAndVerify(address)
     }
 
@@ -769,6 +773,7 @@ final class Tab: ObservableObject, Identifiable {
         guard let url = pending else { return false }
         pending = nil
         failure = nil
+        failureCode = nil
         reading = 0
         lastY = 0
         reader = false
@@ -792,6 +797,7 @@ final class Tab: ObservableObject, Identifiable {
     func setAddressOptimistically(_ url: URL) {
         address = url
         failure = nil
+        failureCode = nil
         adoptIcon()
     }
 

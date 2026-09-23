@@ -43,7 +43,7 @@ struct Page: View {
             }
 
             if let failure = tab.failure {
-                Trouble(message: failure) { tab.reload() }
+                Trouble(message: failure, code: tab.failureCode) { tab.reload() }
                     .transition(.opacity)
             }
 
@@ -180,6 +180,7 @@ final class StageView: NSView {
 /// worth offering — another go.
 private struct Trouble: View {
     let message: String
+    let code: String?
     let retry: () -> Void
 
     var body: some View {
@@ -187,6 +188,11 @@ private struct Trouble: View {
             Text(message)
                 .font(.system(size: 14))
                 .foregroundStyle(Palette.ink)
+            if let code {
+                Text(code)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(Palette.faint)
+            }
             Button("Try again", action: retry)
                 .buttonStyle(.plain)
                 .font(.system(size: 12))

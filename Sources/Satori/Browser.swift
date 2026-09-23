@@ -1731,6 +1731,7 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         guard let tab = tab(for: webView) else { return }
         tab.failure = nil
+        tab.failureCode = nil
         tab.typing = false
         // Whatever you last set this site to, before it draws a single frame
         // at the wrong size.
@@ -1768,6 +1769,7 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
         // it downloaded again.
         guard !(nsError.domain == "WebKitErrorDomain" && code == 102) else { return }
         tab(for: webView)?.failure = message(for: code)
+        tab(for: webView)?.failureCode = "\(nsError.domain) \(code)"
     }
 
     private func message(for code: Int) -> String {
