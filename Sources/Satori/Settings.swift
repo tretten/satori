@@ -13,6 +13,7 @@ struct SettingsPanel: View {
     @ObservedObject private var shield = Shield.shared
     @State private var isDefault = Links.isDefault
     @State private var page: Page = Page(rawValue: Store.settings.string(forKey: "settings.page") ?? "") ?? .general
+    @StateObject private var recorder = ShortcutRecorder()
 
     enum Page: String, CaseIterable, Identifiable {
         case general, tabs, search, extensions, passwords, shortcuts, privacy, about
@@ -297,22 +298,44 @@ struct SettingsPanel: View {
 
     // MARK: - shortcuts
 
+    /// Every keystroke, taught on the spot: press a combo to give it, esc to
+    /// keep the old one, ⌫ to give the preset back.
     private var shortcuts: some View {
-        Card {
-            Shortcut("⌘L", "Address")
-            Rule()
-            Shortcut("⌘K", "Switch tab")
-            Rule()
-            Shortcut("⌘T  ⌘W  ⇧⌘T", "New, close, reopen tab")
-            Rule()
-            Shortcut("⇧⌘S", "Tabs in a sidebar")
-            Rule()
-            Shortcut("⇧⌘R", "Reading mode")
-            Rule()
-            Shortcut("⇧⌘H", "Hide something on this site")
-            Rule()
-            Shortcut("⇧⌘P", "Float the video")
+        VStack(alignment: .leading, spacing: 18) {
+            Card {
+                ForEach(Array(ShortcutAction.allCases.enumerated()), id: \.element.id) { index, action in
+                    if index > 0 { Rule() }
+                    Line(action.title) {
+                        Button {
+                            if prefs.recording == action {
+                                recorder.stop(prefs: prefs)
+                            } else {
+                                recorder.start(action, prefs: prefs) { browser.objectWillChange.send() }
+                            }
+                        } label: {
+                            Text(prefs.recording == action ? "Press keys…" : prefs.binding(for: action).display)
+                                .font(.system(size: 12, design: .rounded))
+                                .foregroundStyle(prefs.recording == action ? Palette.ground : Palette.muted)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(prefs.recording == action ? Palette.ink : Palette.wash, in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            if !prefs.shortcutOverrides.isEmpty {
+                Card {
+                    Line("Back to every default") {
+                        Pill("Reset all") {
+                            prefs.shortcutOverrides = [:]
+                            browser.objectWillChange.send()
+                        }
+                    }
+                }
+            }
         }
+        .onDisappear { recorder.stop(prefs: prefs) }
     }
 
     // MARK: - privacy

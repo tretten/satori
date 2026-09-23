@@ -110,6 +110,14 @@ final class Preferences: ObservableObject {
     @Published var engine: Engine {
         didSet { store.set(engine.rawValue, forKey: "engine") }
     }
+    /// Combos the person taught, by action name. Empty means every default —
+    /// never read directly, `binding(for:)` falls back to the preset.
+    @Published var shortcutOverrides: [String: String] {
+        didSet { store.set(shortcutOverrides, forKey: "shortcuts") }
+    }
+    /// The action being taught a combo right now, if any. While set, the
+    /// app's own key monitor stands down so teaching never triggers.
+    @Published var recording: ShortcutAction? = nil
 
     init() {
         // Carried over from when there were four ways of holding the browser
@@ -126,7 +134,7 @@ final class Preferences: ObservableObject {
             ?? (store.string(forKey: "manner") == "side")
         let width = store.object(forKey: "sidebar.width") as? Double ?? Double(Metrics.side)
         sideWidth = min(Metrics.sideMax, max(Metrics.sideMin, CGFloat(width)))
-        glyph = store.string(forKey: "glyph").flatMap(Glyph.init) ?? .letters
+        glyph = store.string(forKey: "glyph").flatMap(Glyph.init) ?? .icons
         sleepsTabs = store.object(forKey: "tabs.sleep") as? Bool ?? true
         shielded = store.object(forKey: "shield") as? Bool ?? true
         // Offered by default only in a build that can actually do them —
@@ -152,7 +160,7 @@ final class Preferences: ObservableObject {
             ? testDownloads
             : (store.string(forKey: "downloads")).map { URL(fileURLWithPath: $0) }
                 ?? FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
-        asksWhereToSave = store.bool(forKey: "downloads.ask")
+        asksWhereToSave = store.object(forKey: "downloads.ask") as? Bool ?? true
         savesPasswords = store.object(forKey: "passwords.save") as? Bool ?? true
         fillsPasswords = store.object(forKey: "passwords.fill") as? Bool ?? true
         // Anyone who already has a session was here before the welcome
@@ -163,6 +171,7 @@ final class Preferences: ObservableObject {
         // Before the first web view exists: WebKit reads these once.
         Preferences.tellWebKit(autocorrect: corrects)
         engine = Engine(rawValue: store.string(forKey: "engine") ?? "") ?? .google
+        shortcutOverrides = store.dictionary(forKey: "shortcuts") as? [String: String] ?? [:]
     }
 
     /// WebKit's text checker takes its orders from the app's standard

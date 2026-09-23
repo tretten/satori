@@ -59,7 +59,7 @@ A **private tab** (`⇧⌘N`) has its own cookie jar and leaves nothing behind w
 | `⇧⌘S` tabs across the top or down the left · `⇧⌘B` bookmark this page | `⇧⌘R` reading mode · `⇧⌘P` float the video · `⇧⌘H` hide something · `⇧⌘U` what is hidden here |
 | `⌘F` find · `⌘D` duplicate tab · `⇧⌘C` copy address · `⇧⌘V` paste and go | `⌘Y` history · `⇧⌘J` downloads · `⌘,` settings · `⌥⌘L` passwords |
 
-`Tab` walks along the row of tabs; `esc` puts away whatever is open.
+`Tab` walks along the row of tabs; `esc` puts away whatever is open. Teach every shortcut another combo in Settings › Shortcuts.
 
 ---
 

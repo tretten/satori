@@ -86,11 +86,13 @@ struct SatoriApp: App {
                     .keyboardShortcut("0")
             }
             CommandMenu("Tabs") {
+                let back = browser.prefs.binding(for: .back)
+                let forward = browser.prefs.binding(for: .forward)
                 Button("Back") { browser.back() }
-                    .keyboardShortcut("[")
+                    .keyboardShortcut(back.keyEquivalent, modifiers: back.eventModifiers)
                     .disabled(browser.active?.canGoBack != true)
                 Button("Forward") { browser.forward() }
-                    .keyboardShortcut("]")
+                    .keyboardShortcut(forward.keyEquivalent, modifiers: forward.eventModifiers)
                     .disabled(browser.active?.canGoForward != true)
                 Divider()
                 Button("Next Tab") { browser.step(1) }
@@ -637,6 +639,9 @@ struct ContentView: View {
     }
 
     private func take(_ event: NSEvent) -> Bool {
+        // A combo being taught goes straight to the recorder: teaching one
+        // must never fire one.
+        guard browser.prefs.recording == nil else { return false }
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let key = event.charactersIgnoringModifiers?.lowercased() ?? ""
 
@@ -717,6 +722,12 @@ struct ContentView: View {
 
         // Anything with ⌥ or ⌃ on top is somebody else's.
         guard !flags.contains(.option), !flags.contains(.control) else { return false }
+
+        // A taught combo wins over every default below it.
+        if let taught = browser.prefs.overrideMatch(key: key, flags: flags) {
+            taught.perform(on: browser)
+            return true
+        }
 
         switch key {
         case "t" where !shifted:
