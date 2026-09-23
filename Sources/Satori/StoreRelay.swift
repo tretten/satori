@@ -14,7 +14,7 @@ import WebKit
 // and the installing.
 
 final class StoreRelay: NSObject, WKScriptMessageHandler {
-    static let name = "officeStore"
+    static let name = "satoriStore"
 
     weak var tab: Tab?
 
@@ -39,7 +39,7 @@ final class StoreRelay: NSObject, WKScriptMessageHandler {
     /// in the same section.
     static let script = """
     (function () {
-      if (location.hostname !== 'chromewebstore.google.com' || window.__officeStore) return;
+      if (location.hostname !== 'chromewebstore.google.com' || window.__satoriStore) return;
       var state = { installed: [], busy: null };
 
       function pageID() {
@@ -61,7 +61,7 @@ final class StoreRelay: NSObject, WKScriptMessageHandler {
       function bannerOf(button) {
         var box = null, up = button.parentElement;
         while (up && up !== document.body) {
-          if (up.querySelector('button[disabled], button[data-office]')) break;
+          if (up.querySelector('button[disabled], button[data-satori]')) break;
           if ((up.innerText || '').length > 160) break;
           box = up;
           up = up.parentElement;
@@ -120,28 +120,28 @@ final class StoreRelay: NSObject, WKScriptMessageHandler {
           original.dataset.office = 'theirs';
           original.style.display = 'none';
           original.parentNode.insertBefore(ours, original.nextSibling);
-          window.webkit.messageHandlers.officeStore.postMessage({ placed: pageID() });
+          window.webkit.messageHandlers.satoriStore.postMessage({ placed: pageID() });
         }
         renderAll();
       }
 
       // The store keeps the pages it has left, hidden, beside the one it shows.
       function renderAll() {
-        var mine = document.querySelectorAll('button[data-office="add"]');
+        var mine = document.querySelectorAll('button[data-satori="add"]');
         for (var i = 0; i < mine.length; i++) render(mine[i]);
       }
 
       // Caught on the window, before the store's own handlers — which listen
       // on the document — can see the click at all.
       window.addEventListener('click', function (e) {
-        var mine = e.target && e.target.closest && e.target.closest('button[data-office="add"]');
+        var mine = e.target && e.target.closest && e.target.closest('button[data-satori="add"]');
         if (!mine) return;
         e.preventDefault();
         e.stopImmediatePropagation();
-        if (!mine.disabled) window.webkit.messageHandlers.officeStore.postMessage({ add: true });
+        if (!mine.disabled) window.webkit.messageHandlers.satoriStore.postMessage({ add: true });
       }, true);
 
-      window.__officeStore = {
+      window.__satoriStore = {
         state: function (next) {
           state = next || state;
           renderAll();

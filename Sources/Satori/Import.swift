@@ -216,7 +216,7 @@ enum Chromium {
     /// removes it; a failed copy throws instead.
     private static func spareCopy(of file: URL) throws -> URL {
         let temp = FileManager.default.temporaryDirectory
-            .appendingPathComponent("office-import-\(UUID().uuidString).db")
+            .appendingPathComponent("satori-import-\(UUID().uuidString).db")
         try FileManager.default.copyItem(at: file, to: temp)
         return temp
     }

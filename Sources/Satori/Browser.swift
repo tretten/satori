@@ -1250,6 +1250,7 @@ final class Browser: NSObject, ObservableObject {
         }
         tab.onPickEnd = { [weak self] _ in self?.veiling = false }
         tab.onImageMenu = { [weak self] tab, url in self?.showImageMenu(for: tab, at: url) }
+        tab.onVideoMenu = { [weak self] tab, state in self?.showVideoMenu(for: tab, state: state) }
         tab.onStoreAdd = { [weak self] tab in self?.addFromStore(tab) }
 
         // The caret in a sign-in box: the accounts kept for this site hang

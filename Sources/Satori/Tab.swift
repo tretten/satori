@@ -189,6 +189,10 @@ final class Tab: ObservableObject, Identifiable {
     /// download it and then, on at least some sites, does neither — see
     /// ImageMenu.swift for why this is built rather than patched.
     var onImageMenu: ((Tab, URL) -> Void)?
+    /// Right-click landed on a video. WebKit's own menu offers to download
+    /// it and then does nothing — see VideoMenu.swift for why this is built
+    /// rather than patched.
+    var onVideoMenu: ((Tab, VideoState) -> Void)?
     /// "Add to Satori" was pressed on the Chrome Web Store page this tab shows.
     var onStoreAdd: ((Tab) -> Void)?
     /// The extension whose store page has its own "Add to Satori" button in
@@ -199,6 +203,7 @@ final class Tab: ObservableObject, Identifiable {
     private let veils_ = VeilRelay()
     private let forms = FormRelay()
     private let images = ImageRelay()
+    private let videos = VideoRelay()
     private let shop = StoreRelay()
     private let ears = AudioWatch()
     private var lastY: Double = 0
@@ -291,10 +296,12 @@ final class Tab: ObservableObject, Identifiable {
         controller.removeScriptMessageHandler(forName: VeilRelay.name)
         controller.removeScriptMessageHandler(forName: FormRelay.name)
         controller.removeScriptMessageHandler(forName: ImageRelay.name)
+        controller.removeScriptMessageHandler(forName: VideoRelay.name)
         controller.removeScriptMessageHandler(forName: StoreRelay.name)
         controller.add(relay, name: ScrollRelay.name)
         controller.add(veils_, name: VeilRelay.name)
         controller.add(images, name: ImageRelay.name)
+        controller.add(videos, name: VideoRelay.name)
         controller.add(shop, name: StoreRelay.name)
         controller.add(forms, name: FormRelay.name)
         Shield.shared.protect(controller)
@@ -337,6 +344,7 @@ final class Tab: ObservableObject, Identifiable {
         veils_.tab = self
         forms.tab = self
         images.tab = self
+        videos.tab = self
         shop.tab = self
         ears.watch(web) { [weak self] on in self?.noisy = on }
         return web
@@ -395,6 +403,9 @@ final class Tab: ObservableObject, Identifiable {
             WKUserScript(source: ImageRelay.watch, injectionTime: .atDocumentStart, forMainFrameOnly: false)
         )
         controller.addUserScript(
+            WKUserScript(source: VideoRelay.watch, injectionTime: .atDocumentStart, forMainFrameOnly: false)
+        )
+        controller.addUserScript(
             WKUserScript(source: StoreRelay.script, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
         )
         if !FormRelay.passkeysOffered {
@@ -417,8 +428,8 @@ final class Tab: ObservableObject, Identifiable {
         built?.evaluateJavaScript(Veiling.style(css))
     }
 
-    func startPicking() { web.evaluateJavaScript("window.__officeVeil && window.__officeVeil.on()") }
-    func stopPicking() { web.evaluateJavaScript("window.__officeVeil && window.__officeVeil.off()") }
+    func startPicking() { web.evaluateJavaScript("window.__satoriVeil && window.__satoriVeil.on()") }
+    func stopPicking() { web.evaluateJavaScript("window.__satoriVeil && window.__satoriVeil.off()") }
 
     func foundSignIn() { onSignIn?(self) }
 
@@ -475,7 +486,7 @@ final class Tab: ObservableObject, Identifiable {
             }
             return
         }
-        web.evaluateJavaScript("!!(window.__officeForms && window.__officeForms.hasPassword())") { [weak self] still, _ in
+        web.evaluateJavaScript("!!(window.__satoriForms && window.__satoriForms.hasPassword())") { [weak self] still, _ in
             MainActor.assumeIsolated {
                 guard let self, let sent = self.sent else { return }
                 // The box is still there: a refused sign-in, or the second
@@ -495,7 +506,7 @@ final class Tab: ObservableObject, Identifiable {
     /// when this was offered, are gone by the time it actually runs.
     func fill(user: String, password: String, done: ((Bool) -> Void)? = nil) {
         web.evaluateJavaScript(
-            "window.__officeForms && window.__officeForms.fill(`\(escape(user))`, `\(escape(password))`)"
+            "window.__satoriForms && window.__satoriForms.fill(`\(escape(user))`, `\(escape(password))`)"
         ) { result, _ in
             done?((result as? Bool) ?? false)
         }
@@ -508,12 +519,12 @@ final class Tab: ObservableObject, Identifiable {
     /// Show one hidden thing while the pointer rests on its row in the list.
     func peek(_ selector: String, keeping css: String) {
         web.evaluateJavaScript(
-            "window.__officeVeil && window.__officeVeil.peek(`\(escape(css))`, `\(escape(selector))`)"
+            "window.__satoriVeil && window.__satoriVeil.peek(`\(escape(css))`, `\(escape(selector))`)"
         )
     }
 
     func unpeek(_ css: String) {
-        web.evaluateJavaScript("window.__officeVeil && window.__officeVeil.unpeek(`\(escape(css))`)")
+        web.evaluateJavaScript("window.__satoriVeil && window.__satoriVeil.unpeek(`\(escape(css))`)")
     }
 
     private func escape(_ text: String) -> String {
@@ -611,7 +622,7 @@ final class Tab: ObservableObject, Identifiable {
     func unsaved(_ done: @escaping (Bool) -> Void) {
         guard let built else { return done(false) }
         built.evaluateJavaScript(
-            "!!(window.__officeForms && window.__officeForms.unsaved && window.__officeForms.unsaved())"
+            "!!(window.__satoriForms && window.__satoriForms.unsaved && window.__satoriForms.unsaved())"
         ) { value, _ in
             MainActor.assumeIsolated { done((value as? Bool) == true) }
         }
@@ -647,7 +658,7 @@ final class Tab: ObservableObject, Identifiable {
               let data = try? JSONSerialization.data(withJSONObject: ["installed": installed, "busy": busy.map { $0 as Any } ?? NSNull()]),
               let json = String(data: data, encoding: .utf8)
         else { return }
-        built.evaluateJavaScript("window.__officeStore && window.__officeStore.state(\(json))")
+        built.evaluateJavaScript("window.__satoriStore && window.__satoriStore.state(\(json))")
     }
 
     /// The picture comes off the moment there is something better under it
@@ -856,6 +867,7 @@ final class Tab: ObservableObject, Identifiable {
         controller.removeScriptMessageHandler(forName: VeilRelay.name)
         controller.removeScriptMessageHandler(forName: FormRelay.name)
         controller.removeScriptMessageHandler(forName: ImageRelay.name)
+        controller.removeScriptMessageHandler(forName: VideoRelay.name)
         controller.removeScriptMessageHandler(forName: StoreRelay.name)
         controller.removeAllUserScripts()
         web.onPull = nil

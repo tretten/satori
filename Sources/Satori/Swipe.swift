@@ -44,8 +44,8 @@ enum Swipe {
     /// made to shout.
     static let watch = """
     (function () {
-      if (window.__officeSwipe) return;
-      window.__officeSwipe = true;
+      if (window.__satoriSwipe) return;
+      window.__satoriSwipe = true;
 
       var was = null, said = 0;
 

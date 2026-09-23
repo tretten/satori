@@ -499,7 +499,7 @@ enum Isolate {
       }
       if (!best) return 'none';
 
-      best.setAttribute('data-office-float', '');
+      best.setAttribute('data-satori-float', '');
       var sheet = document.getElementById('office-float');
       if (!sheet) {
         sheet = document.createElement('style');
@@ -507,10 +507,10 @@ enum Isolate {
         (document.head || document.documentElement).appendChild(sheet);
       }
       sheet.textContent = [
-        'html.office-floating, html.office-floating body {',
+        'html.satori-floating, html.satori-floating body {',
         'background:#000 !important; overflow:hidden !important; margin:0 !important}',
-        'html.office-floating body > * { visibility:hidden !important }',
-        'html.office-floating [data-office-float] {',
+        'html.satori-floating body > * { visibility:hidden !important }',
+        'html.satori-floating [data-satori-float] {',
         'visibility:visible !important; position:fixed !important;',
         'left:0 !important; top:0 !important; right:0 !important; bottom:0 !important;',
         'width:100vw !important; height:100vh !important;',
@@ -518,10 +518,10 @@ enum Isolate {
         'object-fit:contain !important; z-index:2147483647 !important}',
         // The player's own controls would sit under ours, and two sets of
         // buttons on one small window is one set too many.
-        'html.office-floating [data-office-float]::-webkit-media-controls {',
+        'html.satori-floating [data-satori-float]::-webkit-media-controls {',
         'display:none !important}'
       ].join('');
-      document.documentElement.classList.add('office-floating');
+      document.documentElement.classList.add('satori-floating');
 
       // The mark has to be defended.
       //
@@ -533,9 +533,9 @@ enum Isolate {
       //
       // So the mark is put back on whatever is playing now, four times a
       // second, for as long as the page is out.
-      clearInterval(window.__officeFloatWatch);
-      window.__officeFloatWatch = setInterval(function () {
-        if (document.querySelector('[data-office-float]')) return;
+      clearInterval(window.__satoriFloatWatch);
+      window.__satoriFloatWatch = setInterval(function () {
+        if (document.querySelector('[data-satori-float]')) return;
         var again = null, most = 0;
         var all = document.querySelectorAll('video');
         for (var j = 0; j < all.length; j++) {
@@ -547,7 +547,7 @@ enum Isolate {
             again = one;
           }
         }
-        if (again) again.setAttribute('data-office-float', '');
+        if (again) again.setAttribute('data-satori-float', '');
       }, 250);
 
       return 'floating';
@@ -559,7 +559,7 @@ enum Isolate {
     static func skip(_ seconds: Double) -> String {
         """
         (function () {
-          var video = document.querySelector('[data-office-float]')
+          var video = document.querySelector('[data-satori-float]')
             || document.querySelector('video');
           if (!video) return false;
           video.currentTime = Math.max(0, video.currentTime + (\(seconds)));
@@ -571,7 +571,7 @@ enum Isolate {
     /// How far through, and whether it is running.
     static let where_ = """
     (function () {
-      var video = document.querySelector('[data-office-float]')
+      var video = document.querySelector('[data-satori-float]')
         || document.querySelector('video');
       if (!video || !video.duration || !isFinite(video.duration)) return [0, true];
       return [video.currentTime / video.duration, !video.paused];
@@ -580,7 +580,7 @@ enum Isolate {
 
     static let toggle = """
     (function () {
-      var video = document.querySelector('[data-office-float]')
+      var video = document.querySelector('[data-satori-float]')
         || document.querySelector('video');
       if (!video) return true;
       if (video.paused) { video.play(); } else { video.pause(); }
@@ -594,7 +594,7 @@ enum Isolate {
       // some players ask for that themselves. Leaving one and not the other
       // leaves you with two.
       try {
-        var out = document.querySelector('video[data-office-float]')
+        var out = document.querySelector('video[data-satori-float]')
           || document.querySelector('video');
         if (out) {
           if (out.webkitPresentationMode === 'picture-in-picture') {
@@ -606,13 +606,13 @@ enum Isolate {
         }
       } catch (e) {}
 
-      clearInterval(window.__officeFloatWatch);
-      window.__officeFloatWatch = null;
-      document.documentElement.classList.remove('office-floating');
+      clearInterval(window.__satoriFloatWatch);
+      window.__satoriFloatWatch = null;
+      document.documentElement.classList.remove('satori-floating');
       var sheet = document.getElementById('office-float');
       if (sheet) sheet.textContent = '';
-      var video = document.querySelector('[data-office-float]');
-      if (video) video.removeAttribute('data-office-float');
+      var video = document.querySelector('[data-satori-float]');
+      if (video) video.removeAttribute('data-satori-float');
       return 'landed';
     })();
     """

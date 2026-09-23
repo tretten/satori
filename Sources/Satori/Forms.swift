@@ -10,7 +10,7 @@ import WebKit
 // box is still empty, which is a sign-in button that stays grey.
 
 final class FormRelay: NSObject, WKScriptMessageHandler {
-    static let name = "officeForms"
+    static let name = "satoriForms"
 
     weak var tab: Tab?
 
@@ -83,7 +83,7 @@ final class FormRelay: NSObject, WKScriptMessageHandler {
 
     static let script = """
     (function () {
-      if (window.__officeForms) return;
+      if (window.__satoriForms) return;
 
       // The password box, and the last box before it that could hold a name.
       function pair() {
@@ -146,7 +146,7 @@ final class FormRelay: NSObject, WKScriptMessageHandler {
         return false;
       }
 
-      window.__officeForms = {
+      window.__satoriForms = {
         unsaved: unsaved,
         fill: function (user, password) {
           var both = pair();
@@ -166,7 +166,7 @@ final class FormRelay: NSObject, WKScriptMessageHandler {
       function offer() {
         var both = pair();
         if (!both || !both.pass.value) return;
-        window.webkit.messageHandlers.officeForms.postMessage({
+        window.webkit.messageHandlers.satoriForms.postMessage({
           kind: 'submit',
           user: both.user ? both.user.value : '',
           password: both.pass.value
@@ -192,7 +192,7 @@ final class FormRelay: NSObject, WKScriptMessageHandler {
       function tell() {
         if (told || !pair()) return;
         told = true;
-        window.webkit.messageHandlers.officeForms.postMessage({ kind: 'form' });
+        window.webkit.messageHandlers.satoriForms.postMessage({ kind: 'form' });
       }
       if (document.readyState === 'complete') { tell(); }
       else { window.addEventListener('load', tell); }
@@ -210,7 +210,7 @@ final class FormRelay: NSObject, WKScriptMessageHandler {
         clearTimeout(settling);
         settling = setTimeout(function () {
           if (pair()) return;
-          window.webkit.messageHandlers.officeForms.postMessage({ kind: 'settled' });
+          window.webkit.messageHandlers.satoriForms.postMessage({ kind: 'settled' });
         }, 400);
       }).observe(document.documentElement, { childList: true, subtree: true });
 
@@ -238,7 +238,7 @@ final class FormRelay: NSObject, WKScriptMessageHandler {
           var r = el.getBoundingClientRect();
           if (r.width > 0 && r.height > 0) rect = { x: r.left, y: r.top, w: r.width, h: r.height };
         }
-        window.webkit.messageHandlers.officeForms.postMessage({
+        window.webkit.messageHandlers.satoriForms.postMessage({
           kind: 'focus',
           typing: editable(el),
           rect: rect
@@ -264,7 +264,7 @@ final class FormRelay: NSObject, WKScriptMessageHandler {
       // the animation. Knowing a moment early is enough to paint it black.
       function immersed() {
         var on = !!(document.fullscreenElement || document.webkitFullscreenElement);
-        window.webkit.messageHandlers.officeForms.postMessage({
+        window.webkit.messageHandlers.satoriForms.postMessage({
           kind: 'fullscreen', on: on
         });
       }
@@ -277,7 +277,7 @@ final class FormRelay: NSObject, WKScriptMessageHandler {
           var was = Element.prototype[name];
           if (!was) return;
           Element.prototype[name] = function () {
-            window.webkit.messageHandlers.officeForms.postMessage({
+            window.webkit.messageHandlers.satoriForms.postMessage({
               kind: 'fullscreen', on: true
             });
             return was.apply(this, arguments);

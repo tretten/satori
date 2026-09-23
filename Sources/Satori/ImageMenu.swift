@@ -22,7 +22,7 @@ import WebKit
 // Safari's own menu would.
 
 final class ImageRelay: NSObject, WKScriptMessageHandler {
-    static let name = "officeImages"
+    static let name = "satoriImages"
 
     weak var tab: Tab?
 
@@ -31,14 +31,14 @@ final class ImageRelay: NSObject, WKScriptMessageHandler {
     /// a broken one, or a 1×1 tracking pixel, isn't worth a menu at all.
     static let watch = """
     (function () {
-      if (window.__officeImages) return;
-      window.__officeImages = true;
+      if (window.__satoriImages) return;
+      window.__satoriImages = true;
       document.addEventListener('contextmenu', function (e) {
         var el = e.target;
         while (el && el.tagName !== 'IMG') el = el.parentElement;
         if (!el || !el.currentSrc || el.naturalWidth < 2) return;
         e.preventDefault();
-        window.webkit.messageHandlers.officeImages.postMessage({ src: el.currentSrc });
+        window.webkit.messageHandlers.satoriImages.postMessage({ src: el.currentSrc });
       }, true);
     })();
     """
@@ -66,18 +66,18 @@ extension Browser {
         guard let webView = tab.built else { return }
         let menu = NSMenu()
         menu.autoenablesItems = false
-        menu.addItem(ImageMenuItem("Open Image in New Tab") { [weak self] in
+        menu.addItem(MenuItem("Open Image in New Tab") { [weak self] in
             self?.open(url, foreground: true)
         })
         menu.addItem(.separator())
-        menu.addItem(ImageMenuItem("Copy Image") { [weak self] in
+        menu.addItem(MenuItem("Copy Image") { [weak self] in
             self?.copyImage(at: url)
         })
-        menu.addItem(ImageMenuItem("Download Image") { [weak self] in
+        menu.addItem(MenuItem("Download Image") { [weak self] in
             self?.downloadImage(at: url, from: webView)
         })
         menu.addItem(.separator())
-        menu.addItem(ImageMenuItem("Copy Image Address") {
+        menu.addItem(MenuItem("Copy Image Address") {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(url.absoluteString, forType: .string)
         })
@@ -120,7 +120,7 @@ extension Browser {
 /// A menu item that runs a closure. NSMenuItem wants a target and a
 /// selector; being both itself is simpler here than a second object to
 /// keep alive alongside it.
-private final class ImageMenuItem: NSMenuItem {
+final class MenuItem: NSMenuItem {
     private let act: () -> Void
 
     init(_ title: String, act: @escaping () -> Void) {

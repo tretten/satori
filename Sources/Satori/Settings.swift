@@ -398,7 +398,7 @@ struct SettingsPanel: View {
                     Text("Satori")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Palette.ink)
-                    Text("by tretten · version \(Updater.version)")
+                    Text("by tretten · version \(Updater.version) (\(Updater.build))")
                         .font(.system(size: 12))
                         .foregroundStyle(Palette.muted)
                 }

@@ -112,7 +112,7 @@ final class Curtain: ObservableObject {
 
 /// Carries a chosen element back from the page.
 final class VeilRelay: NSObject, WKScriptMessageHandler {
-    static let name = "officeVeil"
+    static let name = "satoriVeil"
 
     weak var tab: Tab?
 
@@ -162,7 +162,7 @@ enum Veiling {
     /// and a few functions until somebody actually asks for it.
     static let picker = """
     (function () {
-      if (window.__officeVeil) return;
+      if (window.__satoriVeil) return;
       var frame = null, tag = null, target = null, live = false;
 
       function sheet(id) {
@@ -316,13 +316,13 @@ enum Veiling {
         var el = target || document.elementFromPoint(e.clientX, e.clientY);
         if (!el || el === frame || el === document.documentElement || el === document.body) return;
         try {
-          window.webkit.messageHandlers.officeVeil.postMessage({
+          window.webkit.messageHandlers.satoriVeil.postMessage({
             selector: selectorFor(el),
             label: name(el),
             note: shape(el)
           });
         } catch (err) {
-          window.webkit.messageHandlers.officeVeil.postMessage({ trouble: String(err) });
+          window.webkit.messageHandlers.satoriVeil.postMessage({ trouble: String(err) });
         }
         target = null;
         if (frame) frame.style.display = 'none';
@@ -331,7 +331,7 @@ enum Veiling {
       var presses = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click',
                      'dblclick', 'contextmenu', 'touchstart'];
 
-      window.__officeVeil = {
+      window.__satoriVeil = {
         on: function () {
           if (live) return;
           live = true;
@@ -354,7 +354,7 @@ enum Veiling {
           presses.forEach(function (kind) {
             document.removeEventListener(kind, kind === 'pointerdown' ? onPress : swallow, true);
           });
-          window.webkit.messageHandlers.officeVeil.postMessage({ off: true });
+          window.webkit.messageHandlers.satoriVeil.postMessage({ off: true });
         },
         // Show one hidden thing for as long as the pointer rests on its row.
         // The stylesheet is rebuilt without that one selector rather than
