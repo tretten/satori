@@ -287,13 +287,6 @@ struct ContentView: View {
             }
         }
         .ignoresSafeArea()
-        // Helium's dark rim, drawn just inside the frame: one point of ink
-        // at a third, following the window's own rounding a hair inside it.
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Palette.ink.opacity(0.35), lineWidth: 1)
-                .allowsHitTesting(false)
-        }
         .animation(Motion.glide, value: browser.prefs.sidebar)
         .animation(.easeOut(duration: 0.12), value: browser.active?.immersed)
     }
