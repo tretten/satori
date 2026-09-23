@@ -18,10 +18,10 @@ cd "$(dirname "$0")"
 WORLD=$(printf '%s' "${SATORI_PROBE:-test}" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9-')
 case "$WORLD" in ""|1) WORLD=test ;; esac
 if [ "$WORLD" = test ]; then
-  SUITE=com.tretten.satori.test; HASH=0
+  SUITE=com.brandkit.satori.test; HASH=0
 else
   # Store.probeStore: FNV-1a of the name in the store's identifier.
-  SUITE="com.tretten.satori.test.$WORLD"; HASH=2166136261
+  SUITE="com.brandkit.satori.test.$WORLD"; HASH=2166136261
   for ((i = 0; i < ${#WORLD}; i++)); do
     HASH=$(( ((HASH ^ $(printf '%d' "'${WORLD:i:1}")) * 16777619) & 0xFFFFFFFF ))
   done
@@ -32,7 +32,7 @@ if [ "${1:-}" != "again" ]; then
   rm -rf "$HOME/Library/Application Support/Satori ($WORLD)"
   defaults delete "$SUITE" 2>/dev/null || true
   # Store.probeStore(1), the fixed identifier of the world's website data.
-  rm -rf "$HOME/Library/WebKit/com.tretten.satori/WebsiteDataStore/$STORE"
+  rm -rf "$HOME/Library/WebKit/com.brandkit.satori/WebsiteDataStore/$STORE"
   echo "world \"$WORLD\" wiped"
 fi
 

@@ -11,8 +11,8 @@
        embedded in the app, which build.sh does when Satori.provisionprofile
        is next to it. The two identifiers are how macOS ties the app to that
        profile: without them the restricted entitlement is refused. -->
-  <key>com.apple.application-identifier</key><string>7BYKA895MC.com.tretten.satori</string>
-  <key>com.apple.developer.team-identifier</key><string>7BYKA895MC</string>
+  <key>com.apple.application-identifier</key><string>6J5M86XWKN.com.brandkit.satori</string>
+  <key>com.apple.developer.team-identifier</key><string>6J5M86XWKN</string>
   <key>com.apple.developer.web-browser.public-key-credential</key><true/>
 </dict>
 </plist>

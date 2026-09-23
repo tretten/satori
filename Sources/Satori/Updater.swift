@@ -15,7 +15,7 @@ import Security
 //
 // What the updater leaves alone, on purpose: everything in
 // ~/Library/Application Support/Satori, the defaults under
-// com.tretten.satori, and the keychain. The session, the pins, the
+// com.brandkit.satori, and the keychain. The session, the pins, the
 // history, the passwords — none of it is read, moved or rewritten here. Only
 // the bundle changes hands, and it keeps its bundle id and its signing
 // identity, so the keychain items the old build made open for the new one.

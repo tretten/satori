@@ -58,7 +58,7 @@ enum Store {
     /// differ from stores made by identifier in how long extension workers
     /// are let live.
     static var ownContainer: Bool {
-        (Bundle.main.bundleIdentifier ?? "") != "com.tretten.satori"
+        (Bundle.main.bundleIdentifier ?? "") != "com.brandkit.satori"
     }
 
     /// The fixed identifiers of a test world's WebKit stores: 1 for websites,
@@ -119,7 +119,7 @@ enum Store {
             carryOver(into: .standard)
             return .standard
         }
-        let suite = world == "test" ? "com.tretten.satori.test" : "com.tretten.satori.test.\(world ?? "")"
+        let suite = world == "test" ? "com.brandkit.satori.test" : "com.brandkit.satori.test.\(world ?? "")"
         return UserDefaults(suiteName: suite) ?? .standard
     }()
 
