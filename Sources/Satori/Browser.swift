@@ -1766,8 +1766,10 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
         // navigation with "frame load interrupted" (102) while the file goes
         // on arriving. Answered as a failure, it covered the page with "The
         // page didn't load" over a download that had worked — clicked again,
-        // it downloaded again.
-        guard !(nsError.domain == "WebKitErrorDomain" && code == 102) else { return }
+        // it downloaded again. The same for a video opened straight: 204 is
+        // the media player taking the load over, and the page is the player.
+        let handedOver = nsError.domain == "WebKitErrorDomain" && (code == 102 || code == 204)
+        guard !handedOver else { return }
         tab(for: webView)?.failure = message(for: code)
         tab(for: webView)?.failureCode = "\(nsError.domain) \(code)"
     }
