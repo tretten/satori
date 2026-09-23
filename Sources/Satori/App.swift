@@ -287,7 +287,7 @@ struct ContentView: View {
             }
         }
         .ignoresSafeArea()
-        .animation(Motion.glide, value: browser.prefs.sidebar)
+        .animation(Motion.settle, value: browser.prefs.sidebar)
         .animation(.easeOut(duration: 0.12), value: browser.active?.immersed)
     }
 

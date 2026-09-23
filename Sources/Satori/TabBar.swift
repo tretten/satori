@@ -149,11 +149,11 @@ struct TabBar: View {
         }
         .background(landing ? Palette.hover : .clear)
         .animation(Motion.quick, value: landing)
-        .animation(Motion.glide, value: browser.activeID)
+        .animation(Motion.settle, value: browser.activeID)
         // The row makes room for the field on the same spring as everything
         // else. Without this the widths changed between one frame and the next
         // and the tabs appeared to jump aside.
-        .animation(Motion.glide, value: browser.editingTab)
+        .animation(Motion.settle, value: browser.editingTab)
         .animation(Motion.settle, value: browser.tabs.map(\.id))
     }
 
@@ -188,7 +188,7 @@ struct TabBar: View {
         guard overflowing(in: strip), let id = browser.activeID else { return }
         DispatchQueue.main.async {
             if gliding {
-                withAnimation(Motion.glide) { reader.scrollTo(id) }
+                withAnimation(Motion.settle) { reader.scrollTo(id) }
             } else {
                 reader.scrollTo(id)
             }
@@ -398,8 +398,8 @@ private struct TabPill: View {
         .contextMenu { TabMenu(browser: browser, tab: tab, close: close) }
         .help(pinned || compact ? tab.label : "")
         .animation(Motion.quick, value: hovering)
-        .animation(Motion.glide, value: editing)
-        .animation(Motion.glide, value: tab.pin)
+        .animation(Motion.settle, value: editing)
+        .animation(Motion.settle, value: tab.pin)
         .onChange(of: browser.refusals) { _, _ in
             guard editing else { return }
             shake = 0

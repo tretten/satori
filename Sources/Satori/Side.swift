@@ -91,8 +91,8 @@ struct SideBar: View {
             browser.take(providers)
         }
         .animation(Motion.quick, value: landing)
-        .animation(Motion.glide, value: browser.activeID)
-        .animation(Motion.glide, value: browser.editingTab)
+        .animation(Motion.settle, value: browser.activeID)
+        .animation(Motion.settle, value: browser.editingTab)
         .animation(Motion.settle, value: browser.tabs.map(\.id))
         .animation(Motion.settle, value: browser.pinnedCount)
     }
@@ -533,7 +533,7 @@ private struct SideRow: View {
         .onHover { hovering = $0 }
         .contextMenu { TabMenu(browser: browser, tab: tab, close: close) }
         .animation(Motion.quick, value: hovering)
-        .animation(Motion.glide, value: editing)
+        .animation(Motion.settle, value: editing)
         .onChange(of: browser.refusals) { _, _ in
             guard editing else { return }
             shake = 0
@@ -589,7 +589,7 @@ struct Door: View {
                 )
                 .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(Pressable())
         .onHover { hovering = $0 }
         .help(help)
         .animation(Motion.quick, value: hovering)

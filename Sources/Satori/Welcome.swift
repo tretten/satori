@@ -50,7 +50,7 @@ struct WelcomePanel: View {
             }
             .padding(40)
         }
-        .animation(Motion.glide, value: page)
+        .animation(Motion.settle, value: page)
         .transition(.opacity)
     }
 
@@ -120,10 +120,10 @@ struct WelcomePanel: View {
             heading("Two ways to hold it.", "Titles across the top, or down the side. The grey slides to the tab you pick either way, and you can change your mind with ⇧⌘S.")
             HStack(spacing: 12) {
                 Way(title: "Tab strip", sidebar: false, chosen: !prefs.sidebar) {
-                    withAnimation(Motion.glide) { prefs.sidebar = false }
+                    withAnimation(Motion.settle) { prefs.sidebar = false }
                 }
                 Way(title: "Sidebar", sidebar: true, chosen: prefs.sidebar) {
-                    withAnimation(Motion.glide) { prefs.sidebar = true }
+                    withAnimation(Motion.settle) { prefs.sidebar = true }
                 }
             }
             HStack(spacing: 12) {

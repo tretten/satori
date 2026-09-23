@@ -152,9 +152,18 @@ enum Theme {
 // arrives or leaves. Using the same two everywhere is most of why a thing feels
 // like a single piece of software rather than a pile of views.
 enum Motion {
-    static let glide = Animation.spring(response: 0.34, dampingFraction: 0.82)
-    static let settle = Animation.spring(response: 0.30, dampingFraction: 0.86)
+    static let settle = Animation.spring(response: 0.30, dampingFraction: 1.0)
     static let quick = Animation.easeOut(duration: 0.14)
+}
+
+/// Press feedback on the way down, not on release: the control answers the
+/// instant it is held.
+struct Pressable: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+    }
 }
 
 /// Satori's mark — Drice's Subtract.svg, a pill with an S cut out of it,

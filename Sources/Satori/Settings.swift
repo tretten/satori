@@ -205,7 +205,7 @@ struct SettingsPanel: View {
             Line("Tabs in a sidebar", "Down the left instead of across the top. Pull its edge to make it wider; double-click the edge to reset.") {
                 Switch(on: Binding(
                     get: { prefs.sidebar },
-                    set: { on in withAnimation(Motion.glide) { prefs.sidebar = on } }
+                    set: { on in withAnimation(Motion.settle) { prefs.sidebar = on } }
                 ))
             }
             Rule()
@@ -593,7 +593,7 @@ struct Pill: View {
                 .overlay(Capsule().strokeBorder(filled ? .clear : Palette.hairline, lineWidth: 1))
                 .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(Pressable())
         .onHover { hovering = $0 }
         .animation(Motion.quick, value: hovering)
     }

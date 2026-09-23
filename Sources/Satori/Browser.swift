@@ -78,7 +78,7 @@ final class Browser: NSObject, ObservableObject {
 
     /// ⇧⌘S. The same tabs, down the left or across the top.
     func toggleSidebar() {
-        withAnimation(Motion.glide) { prefs.sidebar.toggle() }
+        withAnimation(Motion.settle) { prefs.sidebar.toggle() }
     }
 
     /// The address field, raised over a page by ⌘L. A blank tab shows it
