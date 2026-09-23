@@ -66,18 +66,18 @@ extension Browser {
         guard let webView = tab.built else { return }
         let menu = NSMenu()
         menu.autoenablesItems = false
-        menu.addItem(MenuItem("Open Image in New Tab") { [weak self] in
+        menu.addItem(MenuItem("Open Image in New Tab", image: "plus.square.on.square") { [weak self] in
             self?.open(url, foreground: true)
         })
         menu.addItem(.separator())
-        menu.addItem(MenuItem("Copy Image") { [weak self] in
+        menu.addItem(MenuItem("Copy Image", image: "doc.on.doc") { [weak self] in
             self?.copyImage(at: url)
         })
-        menu.addItem(MenuItem("Download Image") { [weak self] in
+        menu.addItem(MenuItem("Download Image", image: "arrow.down.to.line") { [weak self] in
             self?.downloadImage(at: url, from: webView)
         })
         menu.addItem(.separator())
-        menu.addItem(MenuItem("Copy Image Address") {
+        menu.addItem(MenuItem("Copy Image Address", image: "link") {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(url.absoluteString, forType: .string)
         })
@@ -123,10 +123,13 @@ extension Browser {
 final class MenuItem: NSMenuItem {
     private let act: () -> Void
 
-    init(_ title: String, act: @escaping () -> Void) {
+    init(_ title: String, image: String? = nil, act: @escaping () -> Void) {
         self.act = act
         super.init(title: title, action: #selector(run), keyEquivalent: "")
         target = self
+        if let image {
+            self.image = NSImage(systemSymbolName: image, accessibilityDescription: nil)
+        }
     }
 
     required init(coder: NSCoder) { fatalError() }

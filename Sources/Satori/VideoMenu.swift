@@ -83,35 +83,35 @@ extension Browser {
         let web = tab.web
         let menu = NSMenu()
         menu.autoenablesItems = false
-        menu.addItem(MenuItem(state.paused ? "Play" : "Pause") {
+        menu.addItem(MenuItem(state.paused ? "Play" : "Pause", image: state.paused ? "play.fill" : "pause.fill") {
             web.evaluateJavaScript(VideoRelay.act(tag: state.tag, "v.paused?v.play():v.pause()"), completionHandler: nil)
         })
-        menu.addItem(MenuItem(state.muted ? "Unmute" : "Mute") {
+        menu.addItem(MenuItem(state.muted ? "Unmute" : "Mute", image: state.muted ? "speaker.wave.2.fill" : "speaker.slash.fill") {
             web.evaluateJavaScript(VideoRelay.act(tag: state.tag, "v.muted=!v.muted"), completionHandler: nil)
         })
-        let loop = MenuItem("Loop") {
+        let loop = MenuItem("Loop", image: "repeat") {
             web.evaluateJavaScript(VideoRelay.act(tag: state.tag, "v.loop=!v.loop"), completionHandler: nil)
         }
         loop.state = state.looped ? .on : .off
         menu.addItem(loop)
         menu.addItem(.separator())
-        menu.addItem(MenuItem("Enter Full Screen") {
+        menu.addItem(MenuItem("Enter Full Screen", image: "arrow.up.left.and.arrow.down.right") {
             web.evaluateJavaScript(VideoRelay.act(tag: state.tag, "v.requestFullscreen?v.requestFullscreen():(v.webkitEnterFullscreen&&v.webkitEnterFullscreen())"), completionHandler: nil)
         })
-        menu.addItem(MenuItem("Enter Picture in Picture") {
+        menu.addItem(MenuItem("Enter Picture in Picture", image: "pip.enter") {
             web.evaluateJavaScript(VideoRelay.act(tag: state.tag, "v.webkitSetPresentationMode&&v.webkitSetPresentationMode('picture-in-picture')"), completionHandler: nil)
         })
         menu.addItem(.separator())
-        menu.addItem(MenuItem("Open Video in New Tab") { [weak self] in
+        menu.addItem(MenuItem("Open Video in New Tab", image: "plus.square.on.square") { [weak self] in
             self?.open(state.url, foreground: true)
         })
-        menu.addItem(MenuItem("Download Video") { [weak self] in
+        menu.addItem(MenuItem("Download Video", image: "arrow.down.to.line") { [weak self] in
             webView.startDownload(using: URLRequest(url: state.url)) { [weak self] download in
                 self?.keep(download)
             }
         })
         menu.addItem(.separator())
-        menu.addItem(MenuItem("Copy Video Address") {
+        menu.addItem(MenuItem("Copy Video Address", image: "link") {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(state.url.absoluteString, forType: .string)
         })
