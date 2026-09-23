@@ -31,15 +31,13 @@ final class Lights: NSObject {
     private weak var window: NSWindow?
     private let moved: () -> Void
     private var placing = false
-    /// AppKit's own spacing between the three. Safari's toolbar windows use
-    /// 23 points, measured off a screenshot side by side with this one —
-    /// dots 14 × 14 both sides, the step is the only thing that differs.
-    private let spacing: CGFloat = 23
+    /// AppKit's own spacing between the three, tightened past Safari's 23
+    /// by request.
+    private let spacing: CGFloat = 20
 
-    /// The buttons' own size. AppKit draws the circle smaller than the frame
-    /// it is given, so the frame overshoots: 16 points of frame for Safari's
-    /// 14 points of circle, measured side by side.
-    private static let natural = NSSize(width: 16, height: 16)
+    /// AppKit draws the circle smaller than the frame it is given, so the
+    /// frame overshoots — and sits tighter than Safari's, by request.
+    private static let natural = NSSize(width: 18, height: 18)
 
     private init(_ window: NSWindow, moved: @escaping () -> Void) {
         self.window = window
