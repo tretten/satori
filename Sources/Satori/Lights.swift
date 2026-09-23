@@ -36,10 +36,10 @@ final class Lights: NSObject {
     /// dots 14 × 14 both sides, the step is the only thing that differs.
     private let spacing: CGFloat = 23
 
-    /// The buttons' own size: 14 points, measured off Safari side by side —
-    /// a plain window probes at 12, a toolbar window draws 14, and this row
-    /// wants Safari's. Squared: the lights are circles.
-    private static let natural = NSSize(width: 14, height: 14)
+    /// The buttons' own size. AppKit draws the circle smaller than the frame
+    /// it is given, so the frame overshoots: 16 points of frame for Safari's
+    /// 14 points of circle, measured side by side.
+    private static let natural = NSSize(width: 16, height: 16)
 
     private init(_ window: NSWindow, moved: @escaping () -> Void) {
         self.window = window
