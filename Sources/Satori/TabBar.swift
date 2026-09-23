@@ -153,10 +153,11 @@ struct TabBar: View {
                 .padding(.trailing, 12)
                 .coordinateSpace(name: "strip")
             }
-            .frame(width: geo.size.width, height: geo.size.height)
+        .frame(width: geo.size.width, height: geo.size.height)
         }
         .frame(height: Metrics.strip)
         .onHover { nearby = $0 }
+        .border(Color.clear, width: 0)
         // A link dragged onto the row opens there.
         .onDrop(of: [.url, .text], isTargeted: $landing) { providers in
             browser.take(providers)
