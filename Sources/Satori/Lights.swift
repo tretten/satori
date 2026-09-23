@@ -35,16 +35,18 @@ final class Lights: NSObject {
     /// by request.
     private let spacing: CGFloat = 20
 
-    /// The buttons' own size. AppKit draws the circle at a fixed size no
-    /// frame forcing changes — only the bezel around it follows the frame,
-    /// which is the ring that made forced buttons look bigger while the
-    /// circles stayed put. So the frame hugs Safari's 14 instead.
-    private static let natural = NSSize(width: 14, height: 14)
-
     private init(_ window: NSWindow, moved: @escaping () -> Void) {
         self.window = window
         self.moved = moved
         super.init()
+        // Regular metrics, never compact: Tahoe shrinks controls for windows
+        // that ask. The buttons themselves are AppKit's own, in place —
+        // swapping them out zombies the theme frame's raw pointers to the
+        // originals (crashed on launch, 23 Sep 2026), so only the row's place
+        // is ours, never the instances.
+        if #available(macOS 26, *) {
+            window.contentView?.prefersCompactControlSizeMetrics = false
+        }
         let centre = NotificationCenter.default
         for name in [
             NSWindow.didResizeNotification, NSWindow.didEndLiveResizeNotification,
@@ -88,16 +90,13 @@ final class Lights: NSObject {
             frame.origin.y = window.frame.height - height
             container.frame = frame
         }
-        // Only the row moves; the spacing is AppKit's, from its first layout —
-        // and the size is AppKit's own, so the taller bar can't stretch the
-        // three into ovals.
+        // Only the row moves; the spacing is AppKit's doing.
         for (index, button) in buttons.enumerated() {
-            let size = Lights.natural
+            let size = button.frame.size
             let origin = NSPoint(
                 x: Lights.centre.x - size.width / 2 + CGFloat(index) * spacing,
                 y: bar.bounds.height - Lights.centre.y - size.height / 2
             )
-            if button.frame.size != size { button.setFrameSize(size) }
             if button.frame.origin != origin { button.setFrameOrigin(origin) }
         }
         moved()
