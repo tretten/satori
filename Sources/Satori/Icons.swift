@@ -35,6 +35,31 @@ final class Favicons {
     /// variant a site offered. Sites without one keep one file for both.
     private static func key(_ host: String, dark: Bool) -> String { dark ? host + "@dark" : host }
 
+    /// The color the icon mostly is, as hex — the row's fallback when the
+    /// page names no theme-color. Transparency ignored, sixteen samples
+    /// a side is plenty for a tint.
+    static func dominant(_ image: NSImage) -> String? {
+        guard let tiff = image.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff)
+        else { return nil }
+        let step = max(1, min(rep.pixelsWide, rep.pixelsHigh) / 16)
+        var red = 0, green = 0, blue = 0, count = 0
+        for y in stride(from: 0, to: rep.pixelsHigh, by: step) {
+            for x in stride(from: 0, to: rep.pixelsWide, by: step) {
+                guard let pixel = rep.colorAt(x: x, y: y),
+                      pixel.alphaComponent > 0.5,
+                      let rgb = pixel.usingColorSpace(.sRGB)
+                else { continue }
+                red += Int(rgb.redComponent * 255)
+                green += Int(rgb.greenComponent * 255)
+                blue += Int(rgb.blueComponent * 255)
+                count += 1
+            }
+        }
+        guard count > 0 else { return nil }
+        return String(format: "#%02x%02x%02x", red / count, green / count, blue / count)
+    }
+
     /// What is already known, and nothing fetched. In the dark, the dark
     /// variant when there is one, the ordinary icon otherwise.
     func cached(_ host: String) -> NSImage? {

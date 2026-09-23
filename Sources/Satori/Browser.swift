@@ -624,6 +624,15 @@ final class Browser: NSObject, ObservableObject {
         chromeTheme = theme
         chromeDark = (Metrics.Theme.luminance(theme) ?? 1) < 0.5
     }
+
+    /// The row wears the theme-color; without one, the icon's dominant
+    /// color, so black-header sites with no meta still paint it.
+    private func wearTab(_ tab: Tab) {
+        if let meta = tab.theme { wear(meta); return }
+        let host = tab.address?.host()?.lowercased()
+        let icon = tab.icon ?? host.flatMap { Favicons.shared.cached($0) }
+        wear(icon.flatMap(Favicons.dominant))
+    }
     /// The Chrome Web Store's pages, told when installs come and go. See StoreRelay.swift.
     var storeWatch: AnyCancellable?
     private var hush: AnyCancellable?
@@ -658,6 +667,7 @@ final class Browser: NSObject, ObservableObject {
             guard let self else { return }
             for tab in tabs where tab.address?.host()?.lowercased() == host {
                 tab.icon = image
+                if tab.theme == nil, tab.id == activeID { wearTab(tab) }
             }
         }
         // The little window's own three buttons.
@@ -921,7 +931,7 @@ final class Browser: NSObject, ObservableObject {
         if floating == tab.id { land() }
         leaving()
         activeID = tab.id
-        wear(tab.theme)
+        wearTab(tab)
         tab.touch()
         // A tab brought back from last time, or waking from ⌘W while pinned,
         // opens the moment you look at it — and only if there was nothing to
@@ -1754,7 +1764,7 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
             guard let self else { return }
             let theme = value as? String
             tab.theme = theme
-            if tab.id == self.activeID { self.wear(theme) }
+            if tab.id == self.activeID { self.wearTab(tab) }
         }
         // A tab waking from sleep: the new document is in, and a moment
         // after it is on screen the picture of the old one can go.
@@ -1771,6 +1781,7 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
         // be turned on a moment later, and a tab that then has to wait for a
         // fetch looks broken.
         Favicons.shared.fetch(for: tab)
+        if tab.theme == nil, tab.id == activeID { wearTab(tab) }
         guard !tab.shy, !tab.bench else { return }
         history.record(url, title: tab.title)
     }
