@@ -36,19 +36,10 @@ final class Lights: NSObject {
     /// dots 14 × 14 both sides, the step is the only thing that differs.
     private let spacing: CGFloat = 23
 
-    /// The buttons' own size, read off a window AppKit laid out by itself —
-    /// never off this one, whose taller bar stretches them into ovals that
-    /// every later pass would then copy. Squared: the lights are circles.
-    private static let natural: NSSize = {
-        let probe = NSWindow(
-            contentRect: NSMakeRect(0, 0, 100, 100),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
-            backing: .buffered, defer: true
-        )
-        let size = probe.standardWindowButton(.closeButton)?.frame.size
-        let side = min(size?.width ?? 12, size?.height ?? 12)
-        return NSSize(width: side, height: side)
-    }()
+    /// The buttons' own size: 14 points, measured off Safari side by side —
+    /// a plain window probes at 12, a toolbar window draws 14, and this row
+    /// wants Safari's. Squared: the lights are circles.
+    private static let natural = NSSize(width: 14, height: 14)
 
     private init(_ window: NSWindow, moved: @escaping () -> Void) {
         self.window = window
