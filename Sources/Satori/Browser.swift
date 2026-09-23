@@ -625,13 +625,62 @@ final class Browser: NSObject, ObservableObject {
         chromeDark = (Metrics.Theme.luminance(theme) ?? 1) < 0.5
     }
 
-    /// The row wears the theme-color; without one, the icon's dominant
-    /// color, so black-header sites with no meta still paint it.
-    private func wearTab(_ tab: Tab) {
+    /// The row wears the theme-color; without one, the sampled top of the
+    /// page, then the icon's dominant color. `page` is this navigation's
+    /// own sample, so a stale one never paints over a newer page.
+    private func wearTab(_ tab: Tab, page: String? = nil) {
         if let meta = tab.theme { wear(meta); return }
+        if let page { wear(page); return }
         let host = tab.address?.host()?.lowercased()
         let icon = tab.icon ?? host.flatMap { Favicons.shared.cached($0) }
         wear(icon.flatMap(Favicons.dominant))
+    }
+
+    /// The color across the top of the pictured page, as hex — what the row
+    /// leans into when the page names no theme-color. A white flash reads
+    /// as no color rather than a white row.
+    private func sampleTop(of tab: Tab, in webView: WKWebView) {
+        guard tab.theme == nil, let url = tab.address else { return }
+        let config = WKSnapshotConfiguration()
+        config.afterScreenUpdates = false
+        webView.takeSnapshot(with: config) { [weak self, weak tab] image, _ in
+            guard let self, let tab, tab.address == url, tab.theme == nil else { return }
+            if tab.id == self.activeID { self.wearTab(tab, page: Self.topHex(image)) }
+        }
+    }
+
+    private static func topHex(_ image: NSImage?) -> String? {
+        guard let tiff = image?.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff), rep.pixelsWide > 0
+        else { return nil }
+        let width = 48
+        let height = max(1, width * rep.pixelsHigh / rep.pixelsWide)
+        let thumb = NSImage(size: NSSize(width: width, height: height))
+        thumb.lockFocus()
+        rep.draw(in: NSRect(x: 0, y: 0, width: width, height: height))
+        thumb.unlockFocus()
+        guard let small = NSBitmapImageRep(data: thumb.tiffRepresentation ?? Data()),
+              small.pixelsHigh > 4
+        else { return nil }
+        var red = 0, green = 0, blue = 0, count = 0
+        let band = min(small.pixelsHigh, 8)
+        for y in 0 ..< band {
+            for x in stride(from: 0, to: small.pixelsWide, by: 2) {
+                guard let pixel = small.colorAt(x: x, y: y),
+                      pixel.alphaComponent > 0.5,
+                      let rgb = pixel.usingColorSpace(.sRGB)
+                else { continue }
+                red += Int(rgb.redComponent * 255)
+                green += Int(rgb.greenComponent * 255)
+                blue += Int(rgb.blueComponent * 255)
+                count += 1
+            }
+        }
+        guard count > 0 else { return nil }
+        red /= count; green /= count; blue /= count
+        let luminance = 0.2126 * Double(red) / 255 + 0.7152 * Double(green) / 255 + 0.0722 * Double(blue) / 255
+        guard luminance < 0.92 else { return nil }
+        return String(format: "#%02x%02x%02x", red, green, blue)
     }
     /// The Chrome Web Store's pages, told when installs come and go. See StoreRelay.swift.
     var storeWatch: AnyCancellable?
@@ -1781,7 +1830,7 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
         // be turned on a moment later, and a tab that then has to wait for a
         // fetch looks broken.
         Favicons.shared.fetch(for: tab)
-        if tab.theme == nil, tab.id == activeID { wearTab(tab) }
+        if tab.theme == nil, tab.id == activeID { sampleTop(of: tab, in: webView) }
         guard !tab.shy, !tab.bench else { return }
         history.record(url, title: tab.title)
     }
