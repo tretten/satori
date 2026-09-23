@@ -627,10 +627,11 @@ final class Browser: NSObject, ObservableObject {
 
     /// The row wears the theme-color; without one, the sampled top of the
     /// page, then the icon's dominant color. `page` is this navigation's
-    /// own sample, so a stale one never paints over a newer page.
+    /// own sample, kept on the tab so coming back restores it.
     private func wearTab(_ tab: Tab, page: String? = nil) {
         if let meta = tab.theme { wear(meta); return }
-        if let page { wear(page); return }
+        if let page { tab.page = page; wear(page); return }
+        if let cached = tab.page { wear(cached); return }
         let host = tab.address?.host()?.lowercased()
         let icon = tab.icon ?? host.flatMap { Favicons.shared.cached($0) }
         wear(icon.flatMap(Favicons.dominant))
@@ -645,7 +646,8 @@ final class Browser: NSObject, ObservableObject {
         config.afterScreenUpdates = false
         webView.takeSnapshot(with: config) { [weak self, weak tab] image, _ in
             guard let self, let tab, tab.address == url, tab.theme == nil else { return }
-            if tab.id == self.activeID { self.wearTab(tab, page: Self.topHex(image)) }
+            if let hex = Self.topHex(image) { tab.page = hex }
+            if tab.id == self.activeID { self.wearTab(tab) }
         }
     }
 
@@ -1808,6 +1810,9 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
         // Whatever you last set this site to, before it draws a single frame
         // at the wrong size.
         tab.applyRememberedZoom()
+        // A new document drops the last page's sample; the theme-color
+        // below re-wears whatever this one names.
+        tab.page = nil
         // The site's own color for the chrome around it, if it names one.
         tab.web.evaluateJavaScript("document.querySelector('meta[name=\"theme-color\"]')?.content ?? null") { [weak self] value, _ in
             guard let self else { return }
