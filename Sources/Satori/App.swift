@@ -570,11 +570,17 @@ struct ContentView: View {
     }
 
     /// Put the resting circles in the title bar, exactly over the buttons.
+    /// With the buttons hidden outright there is nothing to cover: the layer
+    /// stays put away.
     private func measureLights() {
         guard let window,
               let close = window.standardWindowButton(.closeButton),
+              !close.isHidden,
               let titlebar = close.superview
-        else { return }
+        else {
+            resting?.isHidden = true
+            return
+        }
 
         let view = resting ?? RestingLights()
         if view.superview !== titlebar {

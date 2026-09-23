@@ -11,6 +11,9 @@ import AppKit
 // hand — which is how Claude's own window does it. AppKit lays its title bar
 // out again whenever it sees fit (a resize, full screen, the window becoming
 // key), so every time it does, the buttons are put back.
+//
+// Update: the buttons are hidden outright — no states, no ovals, no
+// redrawing. The row is positioned the same; only the dots are gone.
 
 @MainActor
 final class Lights: NSObject {
@@ -90,8 +93,11 @@ final class Lights: NSObject {
             frame.origin.y = window.frame.height - height
             container.frame = frame
         }
-        // Only the row moves; the spacing is AppKit's doing.
+        // Only the row moves; the spacing is AppKit's doing. The buttons
+        // themselves stay hidden — AppKit unhides them on its own layouts,
+        // so every pass hides them again.
         for (index, button) in buttons.enumerated() {
+            button.isHidden = true
             let size = button.frame.size
             let origin = NSPoint(
                 x: Lights.centre.x - size.width / 2 + CGFloat(index) * spacing,
