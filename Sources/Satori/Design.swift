@@ -109,10 +109,10 @@ enum Theme {
         )
     }
 }
-    /// Where the first tab starts. The traffic lights run from 23 to 83 —
+    /// Where the first tab starts. The traffic lights run from 14 to 74 —
     /// measured, not guessed — so this leaves them the same air on their right
     /// that the window gives them on their left.
-    static let lights: CGFloat = 104
+    static let lights: CGFloat = 95
     /// Back, forward and reload: three doors and the air before the next
     /// one. In the strip they stand right after the lights; in the sidebar
     /// right of them instead.
@@ -120,10 +120,10 @@ enum Theme {
     /// The same three doors again, in the sidebar, where they sit right of
     /// the lights instead. The column already has 10 of horizontal padding
     /// of its own before this even starts, so this is the lights' own edge
-    /// (83) less that padding, plus a sliver of air — not the full breathing
+    /// (74) less that padding, plus a sliver of air — not the full breathing
     /// room a tab row gets, because the sidebar's minimum width doesn't have
     /// it to give.
-    static let sideLights: CGFloat = 76
+    static let sideLights: CGFloat = 67
     /// Tabs are a fixed width rather than the width of their titles, so the
     /// cross always lands in the same place and the row never rearranges
     /// itself while you read it. They give way when there are too many:
