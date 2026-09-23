@@ -87,7 +87,7 @@ enum Metrics {
     /// traffic lights come down with the tabs — otherwise giving the row room
     /// to breathe just leaves it sitting below three buttons it used to line
     /// up with.
-    static let strip: CGFloat = 52
+    static let strip: CGFloat = 44
     /// Where the first tab starts. The traffic lights run from 11 to 71 —
     /// measured, not guessed — so this leaves them the same air on their right
     /// that the window gives them on their left.

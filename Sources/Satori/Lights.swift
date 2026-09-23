@@ -37,7 +37,10 @@ final class Lights: NSObject {
     /// moved, the next not yet — and the three closed up from 23 points apart
     /// to 13, on top of each other, a spacing each later pass then copied
     /// from the one before. Reproduced with ./bench resize, 23 Sep 2026.
+    /// The sizes are kept for the same reason: a taller title bar stretches
+    /// the buttons into ovals, and every pass would copy the stretch.
     private let spacing: CGFloat
+    private let sizes: [NSSize]
 
     private init(_ window: NSWindow, moved: @escaping () -> Void) {
         self.window = window
@@ -45,6 +48,8 @@ final class Lights: NSObject {
         let row = [NSWindow.ButtonType.closeButton, .miniaturizeButton].compactMap { window.standardWindowButton($0) }
         let measured = row.count == 2 ? row[1].frame.minX - row[0].frame.minX : 0
         spacing = (16...32).contains(measured) ? measured : 20
+        sizes = [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton]
+            .compactMap { window.standardWindowButton($0) }.map { $0.frame.size }
         super.init()
         let centre = NotificationCenter.default
         for name in [
@@ -87,13 +92,17 @@ final class Lights: NSObject {
             frame.origin.y = window.frame.height - height
             container.frame = frame
         }
-        // Only the row moves; the spacing is AppKit's, from its first layout.
+        // Only the row moves; the spacing is AppKit's, from its first layout —
+        // and so are the sizes, or the taller bar stretches the three into
+        // ovals and every later pass copies the stretch.
         for (index, button) in buttons.enumerated() {
-            let size = button.frame.size
+            var size = button.frame.size
+            if index < sizes.count { size = sizes[index] }
             let origin = NSPoint(
                 x: Lights.centre.x - size.width / 2 + CGFloat(index) * spacing,
                 y: bar.bounds.height - Lights.centre.y - size.height / 2
             )
+            if button.frame.size != size { button.setFrameSize(size) }
             if button.frame.origin != origin { button.setFrameOrigin(origin) }
         }
         moved()
