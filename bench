@@ -80,28 +80,26 @@ def main(argv):
         return 0
     verb, args = argv[0], argv[1:]
     request = {"do": verb}
-    if verb == "open":
-        if len(args) != 1: sys.exit("usage: bench open URL")
-        request["url"] = args[0]
-    elif verb == "go":
-        if len(args) != 2: sys.exit("usage: bench go ID URL")
-        request["id"], request["url"] = args
-    elif verb in ("wait",):
+    # Plain verbs: positional args map straight onto fields, in order.
+    PLAIN = {
+        "open": ("url",), "go": ("id", "url"),
+        "text": ("id",), "close": ("id",), "sleep": ("id",), "select": ("id",),
+        "eval": ("id", "js"), "click": ("id", "selector"), "submit": ("id", "selector"),
+        "type": ("id", "selector", "text"),
+        "ext-add": ("id",), "ext-press": ("id",), "ext-remove": ("id",), "ext-reload": ("id",),
+        "ext-popup": ("id", "js"), "key": ("id", "text"),
+    }
+    if verb in PLAIN:
+        fields = PLAIN[verb]
+        if len(args) != len(fields):
+            sys.exit(f"usage: bench {verb} {' '.join(f.upper() for f in fields)}")
+        request.update(zip(fields, args))
+        if verb in ("ext-add", "ext-press", "ext-remove", "ext-reload"):
+            request["yes"] = yes
+    elif verb == "wait":
         if not args: sys.exit("usage: bench wait ID [SECONDS]")
         request["id"] = args[0]
         if len(args) > 1: request["seconds"] = float(args[1])
-    elif verb in ("text", "close", "sleep", "select"):
-        if len(args) != 1: sys.exit(f"usage: bench {verb} ID")
-        request["id"] = args[0]
-    elif verb == "eval":
-        if len(args) != 2: sys.exit("usage: bench eval ID JS")
-        request["id"], request["js"] = args
-    elif verb in ("click", "submit"):
-        if len(args) != 2: sys.exit(f"usage: bench {verb} ID SELECTOR")
-        request["id"], request["selector"] = args
-    elif verb == "type":
-        if len(args) != 3: sys.exit("usage: bench type ID SELECTOR TEXT")
-        request["id"], request["selector"], request["text"] = args
     elif verb == "shot":
         if not args: sys.exit("usage: bench shot ID [PATH] [WIDTH]")
         request["id"] = args[0]
@@ -111,10 +109,6 @@ def main(argv):
         if len(args) != 2: sys.exit("usage: bench ui KEY VALUE")
         key, value = args
         request[key] = value if key == "look" else value in ("on", "true", "1", "yes")
-    elif verb in ("ext-add", "ext-press", "ext-remove", "ext-reload"):
-        if len(args) != 1: sys.exit(f"usage: bench {verb} ID")
-        request["id"] = args[0]
-        request["yes"] = yes
     elif verb == "ext-enable":
         if len(args) != 2: sys.exit("usage: bench ext-enable ID on|off")
         request["id"] = args[0]
@@ -137,16 +131,10 @@ def main(argv):
         if len(args) != 1: sys.exit("usage: bench ext-folder PATH")
         request["path"] = os.path.abspath(args[0])
         request["yes"] = yes
-    elif verb == "ext-popup":
-        if len(args) != 2: sys.exit("usage: bench ext-popup ID JS")
-        request["id"], request["js"] = args
     elif verb == "ext-page":
         if not args: sys.exit("usage: bench ext-page ID [PATH]")
         request["id"] = args[0]
         request["path"] = args[1] if len(args) > 1 else ""
-    elif verb == "key":
-        if len(args) != 2: sys.exit("usage: bench key ID TEXT")
-        request["id"], request["text"] = args
     elif verb == "resize":
         if len(args) not in (2, 3): sys.exit("usage: bench resize WIDTH HEIGHT [STEPS]")
         request["width"], request["height"] = float(args[0]), float(args[1])

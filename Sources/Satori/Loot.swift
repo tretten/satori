@@ -27,7 +27,7 @@ final class Loot: ObservableObject {
         kept.removeAll { $0.path == keep.path }
         kept.insert(keep, at: 0)
         // Fifty is more than anybody scrolls back through.
-        if kept.count > 50 { kept.removeLast(kept.count - 50) }
+        kept = Array(kept.prefix(50))
         save()
     }
 

@@ -432,14 +432,28 @@ struct SettingsPanel: View {
     }
 
     // MARK: - pieces
+}
 
-    /// A keystroke and what it does.
-    private struct Shortcut: View {
-        let keys: String
-        let does: String
-        init(_ keys: String, _ does: String) { self.keys = keys; self.does = does }
+/// A keystroke and what it does. Pilled, the way the welcome shows them.
+struct Shortcut: View {
+    let keys: String
+    let does: String
+    var pill = false
+    init(_ keys: String, _ does: String, pill: Bool = false) { self.keys = keys; self.does = does; self.pill = pill }
 
-        var body: some View {
+    var body: some View {
+        if pill {
+            HStack(spacing: 10) {
+                Text(keys)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(Palette.ink)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Palette.wash, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .frame(minWidth: 44)
+                Text(does).font(.system(size: 13)).foregroundStyle(Palette.muted)
+            }
+        } else {
             HStack {
                 Text(does)
                     .font(.system(size: 13))
@@ -460,9 +474,6 @@ struct SettingsPanel: View {
 struct Segmented<Option: Hashable>: View {
     let options: [(Option, String)]
     @Binding var selection: Option
-    /// True when the control has the whole width to itself, so the choices
-    /// share it evenly instead of each taking only what its word needs.
-    var wide = false
 
     @Namespace private var slide
 
@@ -473,9 +484,8 @@ struct Segmented<Option: Hashable>: View {
                     .font(.system(size: 11.5, weight: option == selection ? .medium : .regular))
                     .foregroundStyle(option == selection ? Palette.ink : Palette.muted)
                     .lineLimit(1)
-                    .fixedSize(horizontal: !wide, vertical: false)
-                    .frame(maxWidth: wide ? .infinity : nil)
-                    .padding(.horizontal, wide ? 4 : 10)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background {
                         if option == selection {
@@ -502,45 +512,39 @@ struct Switch: View {
     @Binding var on: Bool
 
     var body: some View {
-        Capsule()
-            .fill(on ? Palette.ink : Palette.faint)
-            .frame(width: 30, height: 18)
-            .overlay(alignment: on ? .trailing : .leading) {
-                Circle()
-                    .fill(Palette.ground)
-                    .shadow(color: .black.opacity(0.18), radius: 1.5, y: 1)
-                    .padding(2)
-            }
-            .contentShape(Capsule())
-            .onTapGesture { withAnimation(Motion.settle) { on.toggle() } }
-            .animation(Motion.settle, value: on)
+        Toggle("", isOn: $on)
+            .toggleStyle(.switch)
+            .tint(Palette.ink)
+            .labelsHidden()
     }
 }
 
 /// A small capsule that does one thing. Outlined by default; filled in ink
-/// when it is the thing you came here to press.
+/// when it is the thing you came here to press. Large for the welcome walk.
 struct Pill: View {
     let title: String
     var filled = false
     var tint: Color = Palette.ink
+    var large = false
     let action: () -> Void
 
     @State private var hovering = false
 
-    init(_ title: String, filled: Bool = false, tint: Color = Palette.ink, action: @escaping () -> Void) {
+    init(_ title: String, filled: Bool = false, tint: Color = Palette.ink, large: Bool = false, action: @escaping () -> Void) {
         self.title = title
         self.filled = filled
         self.tint = tint
+        self.large = large
         self.action = action
     }
 
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 11.5))
+                .font(.system(size: large ? 13 : 11.5, weight: large ? .medium : .regular))
                 .foregroundStyle(filled ? Palette.ground : tint)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
+                .padding(.horizontal, large ? 16 : 10)
+                .padding(.vertical, large ? 9 : 5)
                 .background(filled ? Palette.ink : (hovering ? Palette.hover : Palette.ground), in: Capsule())
                 .overlay(Capsule().strokeBorder(filled ? .clear : Palette.hairline, lineWidth: 1))
                 .contentShape(Capsule())

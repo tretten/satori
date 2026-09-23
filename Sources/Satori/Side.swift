@@ -26,6 +26,7 @@ struct SideBar: View {
     @State private var pinDragging: Tab.ID?
     @State private var pinFrom = 0
     @State private var pinTravel: CGSize = .zero
+    @State private var hoveringNew = false
 
     private static let row: CGFloat = 28
     private static let gap: CGFloat = 2
@@ -317,8 +318,29 @@ struct SideBar: View {
     }
 
     private var newTab: some View {
-        Quiet(icon: "plus", title: "New tab", height: SideBar.row) { browser.newTab() }
-            .padding(.top, SideBar.gap)
+        Button(action: { browser.newTab() }) {
+            HStack(spacing: 8) {
+                Image(systemName: "plus")
+                    .font(.system(size: 10, weight: .medium))
+                    .frame(width: 15)
+                Text("New tab")
+                    .font(.system(size: 12.5))
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(hoveringNew ? Palette.ink.opacity(0.7) : Palette.faint)
+            .padding(.leading, 10)
+            .frame(height: SideBar.row)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(hoveringNew ? Palette.hover : .clear)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .onHover { hoveringNew = $0 }
+        .animation(Motion.quick, value: hoveringNew)
+        .padding(.top, SideBar.gap)
     }
 
     /// One small door at the bottom: the settings.
@@ -359,7 +381,22 @@ private struct PinSquare: View {
     var body: some View {
         Group {
             if browser.editingPin == tab.id {
-                PinField(browser: browser, tab: tab)
+                PillField(browser: browser,
+                    font: .systemFont(ofSize: 12, weight: .medium), alignment: .center,
+                    text: { tab.pin ?? "" },
+                    change: { browser.letter($0, for: tab) },
+                    command: {
+                        switch $0 {
+                        case #selector(NSResponder.insertNewline(_:)),
+                             #selector(NSResponder.cancelOperation(_:)),
+                             #selector(NSResponder.insertTab(_:)):
+                            browser.endPinEdit()
+                            return true
+                        default:
+                            return false
+                        }
+                    },
+                    finish: { browser.endPinEdit() })
             } else if prefs.glyph == .icons, let icon = tab.icon {
                 Mark(icon: icon, letter: tab.pin ?? "", size: scale * 16 / 34, dim: tab.asleep)
             } else {
@@ -409,7 +446,24 @@ private struct SideRow: View {
     var body: some View {
         HStack(spacing: 8) {
             if editing {
-                TabAddressField(browser: browser)
+                PillField(browser: browser,
+                    text: { browser.tabDraft },
+                    change: { browser.tabDraft = $0 },
+                    command: {
+                        switch $0 {
+                        case #selector(NSResponder.insertNewline(_:)):
+                            // Returning true keeps the field editing, which is what lets a
+                            // refused address stay on screen instead of being thrown away.
+                            browser.commitTabEdit()
+                            return true
+                        case #selector(NSResponder.cancelOperation(_:)):
+                            browser.cancelTabEdit()
+                            return true
+                        default:
+                            return false
+                        }
+                    },
+                    finish: { browser.cancelTabEdit() })
                     .frame(height: 16)
             } else {
                 if prefs.glyph == .icons, !tab.isBlank {
@@ -511,41 +565,6 @@ private struct SideRow: View {
     private var colour: Color {
         if live { return Palette.ink }
         return hovering ? Palette.ink.opacity(0.7) : Palette.muted
-    }
-}
-
-/// A row that is an action rather than a page. Quiet until the pointer is on it.
-struct Quiet: View {
-    let icon: String
-    let title: String
-    var height: CGFloat = 28
-    let act: () -> Void
-
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: act) {
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 10, weight: .medium))
-                    .frame(width: 15)
-                Text(title)
-                    .font(.system(size: 12.5))
-                Spacer(minLength: 0)
-            }
-            .foregroundStyle(hovering ? Palette.ink.opacity(0.7) : Palette.faint)
-            .padding(.leading, 10)
-            .frame(height: height)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(hovering ? Palette.hover : .clear)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .animation(Motion.quick, value: hovering)
     }
 }
 

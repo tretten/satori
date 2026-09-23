@@ -102,9 +102,6 @@ enum Metrics {
     /// room a tab row gets, because the sidebar's minimum width doesn't have
     /// it to give.
     static let sideLights: CGFloat = 72
-    /// The band left at the top when there is no strip: just enough for the
-    /// traffic lights to sit in, and nothing else.
-    static let bare: CGFloat = 34
     /// Tabs are a fixed width rather than the width of their titles, so the
     /// cross always lands in the same place and the row never rearranges
     /// itself while you read it. They give way when there are too many:

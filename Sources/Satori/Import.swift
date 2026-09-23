@@ -168,9 +168,7 @@ enum Chromium {
         for file in source.files {
             let icons = file.deletingLastPathComponent().appendingPathComponent("Favicons")
             guard FileManager.default.fileExists(atPath: icons.path) else { continue }
-            let temp = FileManager.default.temporaryDirectory
-                .appendingPathComponent("office-import-\(UUID().uuidString).db")
-            guard (try? FileManager.default.copyItem(at: icons, to: temp)) != nil else { continue }
+            guard let temp = try? spareCopy(of: icons) else { continue }
             defer { try? FileManager.default.removeItem(at: temp) }
 
             var db: OpaquePointer?
@@ -214,6 +212,15 @@ enum Chromium {
         let last: Date
     }
 
+    /// A throwaway copy of a file somebody else may be watching. The caller
+    /// removes it; a failed copy throws instead.
+    private static func spareCopy(of file: URL) throws -> URL {
+        let temp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("office-import-\(UUID().uuidString).db")
+        try FileManager.default.copyItem(at: file, to: temp)
+        return temp
+    }
+
     /// The other browser's history — what it takes to finish an address on
     /// the first day. Same file rules as the passwords: a copy, read once.
     static func places(in source: Source, limit: Int = 3000) -> [Place] {
@@ -227,9 +234,7 @@ enum Chromium {
     }
 
     private static func placeRows(in file: URL, limit: Int) throws -> [Place] {
-        let temp = FileManager.default.temporaryDirectory
-            .appendingPathComponent("office-import-\(UUID().uuidString).db")
-        try FileManager.default.copyItem(at: file, to: temp)
+        let temp = try spareCopy(of: file)
         defer { try? FileManager.default.removeItem(at: temp) }
 
         var db: OpaquePointer?
@@ -337,9 +342,7 @@ enum Chromium {
 
     private static func rows(in file: URL) throws -> [Row] {
         // A copy, next to nothing the other browser is watching.
-        let temp = FileManager.default.temporaryDirectory
-            .appendingPathComponent("office-import-\(UUID().uuidString).db")
-        try FileManager.default.copyItem(at: file, to: temp)
+        let temp = try spareCopy(of: file)
         defer { try? FileManager.default.removeItem(at: temp) }
 
         var db: OpaquePointer?

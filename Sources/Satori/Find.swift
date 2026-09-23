@@ -9,17 +9,11 @@ struct FindBar: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            ZStack(alignment: .leading) {
-                if browser.needle.isEmpty {
-                    Text("Find on page")
-                        .foregroundStyle(Palette.ink.opacity(0.3))
-                }
-                TextField("", text: $browser.needle)
-                    .textFieldStyle(.plain)
-                    .foregroundStyle(Palette.ink)
-                    .focused($focused)
-                    .onSubmit { browser.look(forward: true) }
-            }
+            TextField("", text: $browser.needle, prompt: Text("Find on page").foregroundStyle(Palette.ink.opacity(0.3)))
+                .textFieldStyle(.plain)
+                .foregroundStyle(Palette.ink)
+                .focused($focused)
+                .onSubmit { browser.look(forward: true) }
             .font(.system(size: 12.5))
             .frame(width: 160)
 

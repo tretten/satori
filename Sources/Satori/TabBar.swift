@@ -320,7 +320,22 @@ private struct TabPill: View {
             if pinned {
                 Group {
                     if browser.editingPin == tab.id {
-                        PinField(browser: browser, tab: tab)
+                        PillField(browser: browser,
+                            font: .systemFont(ofSize: 12, weight: .medium), alignment: .center,
+                            text: { tab.pin ?? "" },
+                            change: { browser.letter($0, for: tab) },
+                            command: {
+                                switch $0 {
+                                case #selector(NSResponder.insertNewline(_:)),
+                                     #selector(NSResponder.cancelOperation(_:)),
+                                     #selector(NSResponder.insertTab(_:)):
+                                    browser.endPinEdit()
+                                    return true
+                                default:
+                                    return false
+                                }
+                            },
+                            finish: { browser.endPinEdit() })
                     } else if prefs.glyph == .icons, let icon = tab.icon {
                         Mark(icon: icon, letter: tab.pin ?? "", size: 16, dim: tab.asleep)
                     } else {
@@ -398,7 +413,24 @@ private struct TabPill: View {
     private var titled: some View {
         HStack(spacing: 6) {
             if editing {
-                TabAddressField(browser: browser)
+                PillField(browser: browser,
+                    text: { browser.tabDraft },
+                    change: { browser.tabDraft = $0 },
+                    command: {
+                        switch $0 {
+                        case #selector(NSResponder.insertNewline(_:)):
+                            // Returning true keeps the field editing, which is what lets a
+                            // refused address stay on screen instead of being thrown away.
+                            browser.commitTabEdit()
+                            return true
+                        case #selector(NSResponder.cancelOperation(_:)):
+                            browser.cancelTabEdit()
+                            return true
+                        default:
+                            return false
+                        }
+                    },
+                    finish: { browser.cancelTabEdit() })
                     .frame(height: 16)
             } else {
                 if prefs.glyph == .icons, !tab.isBlank {
@@ -509,15 +541,21 @@ private struct TabPill: View {
     }
 }
 
-/// The address, inside its own tab.
-///
-/// A field of its own rather than SwiftUI's, for one reason: the system paints
-/// selected text as a solid block of accent colour, which over a pale grey pill
-/// this size is the loudest thing in the window. Here it is a tenth of the ink.
-struct TabAddressField: NSViewRepresentable {
+/// The address in a tab, the letter on a pin: one AppKit field for the two
+/// places SwiftUI's selection paint is too loud — the system fills selected
+/// text with accent colour, over a pale pill or a thirty-point square the
+/// loudest thing on screen. Here it is a tenth of the ink. Same field,
+/// different wiring.
+struct PillField: NSViewRepresentable {
     @ObservedObject var browser: Browser
+    var font: NSFont = .systemFont(ofSize: 12.5)
+    var alignment: NSTextAlignment = .left
+    var text: () -> String
+    var change: (String) -> Void
+    var command: (Selector) -> Bool
+    var finish: () -> Void
 
-    func makeCoordinator() -> Coordinator { Coordinator(browser: browser) }
+    func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeNSView(context: Context) -> NSTextField {
         let field = NSTextField()
@@ -525,19 +563,24 @@ struct TabAddressField: NSViewRepresentable {
         field.isBordered = false
         field.drawsBackground = false
         field.focusRingType = .none
-        field.font = .systemFont(ofSize: 12.5)
+        field.alignment = alignment
+        field.font = font
         field.textColor = Palette.NS.ink
         field.cell?.usesSingleLineMode = true
         field.cell?.wraps = false
-        field.stringValue = browser.tabDraft
         return field
     }
 
     func updateNSView(_ field: NSTextField, context: Context) {
         let coordinator = context.coordinator
         coordinator.browser = browser
-        if !coordinator.typing, field.stringValue != browser.tabDraft {
-            field.stringValue = browser.tabDraft
+        coordinator.text = text
+        coordinator.change = change
+        coordinator.command = command
+        coordinator.finish = finish
+        let shown = text()
+        if !coordinator.typing, field.stringValue != shown {
+            field.stringValue = shown
         }
         guard !coordinator.claimed else { return }
         coordinator.claimed = true
@@ -553,16 +596,20 @@ struct TabAddressField: NSViewRepresentable {
     }
 
     final class Coordinator: NSObject, NSTextFieldDelegate {
-        var browser: Browser
+        var browser: Browser!
+        var text: () -> String = { "" }
+        var change: (String) -> Void = { _ in }
+        var command: (Selector) -> Bool = { _ in false }
+        var finish: () -> Void = {}
         var claimed = false
         var typing = false
-
-        init(browser: Browser) { self.browser = browser }
 
         func controlTextDidChange(_ note: Notification) {
             guard let field = note.object as? NSTextField else { return }
             typing = true
-            browser.tabDraft = field.stringValue
+            change(field.stringValue)
+            let shown = text()
+            if field.stringValue != shown { field.stringValue = shown }
             typing = false
         }
 
@@ -571,24 +618,13 @@ struct TabAddressField: NSViewRepresentable {
             textView: NSTextView,
             doCommandBy command: Selector
         ) -> Bool {
-            switch command {
-            case #selector(NSResponder.insertNewline(_:)):
-                // Returning true keeps the field editing, which is what lets a
-                // refused address stay on screen instead of being thrown away.
-                browser.commitTabEdit()
-                return true
-            case #selector(NSResponder.cancelOperation(_:)):
-                browser.cancelTabEdit()
-                return true
-            default:
-                return false
-            }
+            self.command(command)
         }
 
         /// Clicking anywhere else is a way of saying never mind.
         func controlTextDidEndEditing(_ note: Notification) {
-            let browser = browser
-            DispatchQueue.main.async { browser.cancelTabEdit() }
+            let finish = finish
+            DispatchQueue.main.async(execute: finish)
         }
     }
 }
@@ -659,97 +695,5 @@ struct Ring: View {
                     angle = 360
                 }
             }
-    }
-}
-
-
-/// The letter of a pinned tab, typed in the square itself.
-///
-/// A field of its own rather than SwiftUI's, for the same reason as the address
-/// in a tab: the system paints selected text as a solid block of accent colour,
-/// and over a thirty-point grey square that is the loudest thing on screen.
-struct PinField: NSViewRepresentable {
-    @ObservedObject var browser: Browser
-    @ObservedObject var tab: Tab
-
-    func makeCoordinator() -> Coordinator { Coordinator(browser: browser, tab: tab) }
-
-    func makeNSView(context: Context) -> NSTextField {
-        let field = NSTextField()
-        field.delegate = context.coordinator
-        field.isBordered = false
-        field.drawsBackground = false
-        field.focusRingType = .none
-        field.alignment = .center
-        field.font = .systemFont(ofSize: 12, weight: .medium)
-        field.textColor = Palette.NS.ink
-        field.cell?.usesSingleLineMode = true
-        field.cell?.wraps = false
-        field.stringValue = tab.pin ?? ""
-        return field
-    }
-
-    func updateNSView(_ field: NSTextField, context: Context) {
-        let coordinator = context.coordinator
-        coordinator.browser = browser
-        coordinator.tab = tab
-        if !coordinator.typing, field.stringValue != tab.pin ?? "" {
-            field.stringValue = tab.pin ?? ""
-        }
-        guard !coordinator.claimed else { return }
-        coordinator.claimed = true
-        DispatchQueue.main.async {
-            field.window?.makeFirstResponder(field)
-            guard let editor = field.currentEditor() as? NSTextView else { return }
-            editor.selectedTextAttributes = [
-                .backgroundColor: NSColor(Palette.ink.opacity(0.12)),
-                .foregroundColor: Palette.NS.ink,
-            ]
-            // The guessed letter arrives selected, so one keystroke replaces it
-            // and doing nothing keeps it.
-            editor.selectAll(nil)
-        }
-    }
-
-    final class Coordinator: NSObject, NSTextFieldDelegate {
-        var browser: Browser
-        var tab: Tab
-        var claimed = false
-        var typing = false
-
-        init(browser: Browser, tab: Tab) {
-            self.browser = browser
-            self.tab = tab
-        }
-
-        func controlTextDidChange(_ note: Notification) {
-            guard let field = note.object as? NSTextField else { return }
-            typing = true
-            browser.letter(field.stringValue, for: tab)
-            // One character only, and shown as it will be worn.
-            field.stringValue = tab.pin ?? ""
-            typing = false
-        }
-
-        func control(
-            _ control: NSControl,
-            textView: NSTextView,
-            doCommandBy command: Selector
-        ) -> Bool {
-            switch command {
-            case #selector(NSResponder.insertNewline(_:)),
-                 #selector(NSResponder.cancelOperation(_:)),
-                 #selector(NSResponder.insertTab(_:)):
-                browser.endPinEdit()
-                return true
-            default:
-                return false
-            }
-        }
-
-        func controlTextDidEndEditing(_ note: Notification) {
-            let browser = browser
-            DispatchQueue.main.async { browser.endPinEdit() }
-        }
     }
 }

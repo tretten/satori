@@ -303,20 +303,15 @@ final class Browser: NSObject, ObservableObject {
     @Published private(set) var saved: [Login] = []
     @Published var hunting = ""
 
-    struct SiteRow {
-        let host: String
-        let logins: [Login]
-    }
-
     /// Grouped by site, filtered by what has been typed.
-    var shownSites: [SiteRow] {
+    var shownSites: [(host: String, logins: [Login])] {
         let needle = hunting.trimmingCharacters(in: .whitespaces).lowercased()
         let rows = needle.isEmpty ? saved : saved.filter {
             $0.host.contains(needle) || $0.user.lowercased().contains(needle)
         }
         let groups = Dictionary(grouping: rows, by: \.host)
         return groups.keys.sorted().map { host in
-            SiteRow(host: host, logins: groups[host]!.sorted { $0.user < $1.user })
+            (host: host, logins: groups[host]!.sorted { $0.user < $1.user })
         }
     }
 
@@ -591,10 +586,8 @@ final class Browser: NSObject, ObservableObject {
 
     func announce(_ text: String) {
         announcement = text
-        hush?.cancel()
-        let work = DispatchWorkItem { [weak self] in self?.announcement = nil }
-        hush = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.7, execute: work)
+        hush = Just(()).delay(for: .seconds(1.7), scheduler: RunLoop.main)
+            .sink { [weak self] _ in self?.announcement = nil }
     }
 
     /// The names extensions asked their downloads to be saved under.
@@ -622,9 +615,9 @@ final class Browser: NSObject, ObservableObject {
     var downloading: [WKDownload] = []
     /// The Chrome Web Store's pages, told when installs come and go. See StoreRelay.swift.
     var storeWatch: AnyCancellable?
-    private var hush: DispatchWorkItem?
+    private var hush: AnyCancellable?
     private var zoomShown = 100
-    private var remembering = false
+    private var rememberWait: AnyCancellable?
 
     // MARK: - beginning and ending
 
@@ -847,13 +840,13 @@ final class Browser: NSObject, ObservableObject {
     }
 
     private func rememberSession() {
-        guard !remembering else { return }
-        remembering = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
-            guard let self else { return }
-            remembering = false
-            writeSession()
-        }
+        guard rememberWait == nil else { return }
+        rememberWait = Just(()).delay(for: .seconds(1.2), scheduler: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.rememberWait = nil
+                self.writeSession()
+            }
     }
 
     /// The app is quitting. Whatever the debounce above was waiting out, it
@@ -1858,8 +1851,9 @@ extension Browser: WKDownloadDelegate {
     /// WebKit refuses to write over a file that is already there, so the name
     /// gains a number rather than the download quietly failing.
     private static func free(_ name: String, in folder: URL) -> URL {
-        let stem = (name as NSString).deletingPathExtension
-        let ext = (name as NSString).pathExtension
+        let file = URL(fileURLWithPath: name)
+        let stem = file.deletingPathExtension().lastPathComponent
+        let ext = file.pathExtension
         var candidate = folder.appendingPathComponent(name)
         var n = 2
         while FileManager.default.fileExists(atPath: candidate.path) {

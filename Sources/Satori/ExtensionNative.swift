@@ -62,11 +62,17 @@ enum ExtensionNative {
         throw Refused(why: "Specified native messaging host not found.")
     }
 
-    /// `runtime.sendNativeMessage`: run, send one, read one, stop.
-    static func send(_ message: Any, to name: String, from extensionID: String) async throws -> Any? {
+    /// The program for `name`, started and speaking, or nothing.
+    private static func makePipe(name: String, extensionID: String) throws -> HostPipe {
         let program = try host(name, for: extensionID)
         let pipe = HostPipe(program: program, origin: "chrome-extension://\(extensionID)/")
         try pipe.start()
+        return pipe
+    }
+
+    /// `runtime.sendNativeMessage`: run, send one, read one, stop.
+    static func send(_ message: Any, to name: String, from extensionID: String) async throws -> Any? {
+        let pipe = try makePipe(name: name, extensionID: extensionID)
         defer { pipe.stop() }
         try pipe.write(message)
         return try await pipe.readOne()
@@ -77,9 +83,7 @@ enum ExtensionNative {
     @MainActor
     static func connect(_ port: WKWebExtension.MessagePort, from extensionID: String) throws {
         guard let name = port.applicationIdentifier else { throw Refused(why: "No host named") }
-        let program = try host(name, for: extensionID)
-        let pipe = HostPipe(program: program, origin: "chrome-extension://\(extensionID)/")
-        try pipe.start()
+        let pipe = try makePipe(name: name, extensionID: extensionID)
         pipe.onMessage = { message in
             DispatchQueue.main.async { port.sendMessage(message, completionHandler: nil) }
         }
@@ -91,19 +95,17 @@ enum ExtensionNative {
             try? pipe.write(message)
         }
         port.disconnectHandler = { _ in pipe.stop() }
-        Live.keep(pipe)
+        keepAlive(pipe)
     }
 
     /// Hosts that are connected, held until they end.
-    private enum Live {
-        nonisolated(unsafe) static var pipes: [ObjectIdentifier: HostPipe] = [:]
-        static func keep(_ pipe: HostPipe) {
-            pipes[ObjectIdentifier(pipe)] = pipe
-            let previous = pipe.onExit
-            pipe.onExit = {
-                previous?()
-                DispatchQueue.main.async { pipes[ObjectIdentifier(pipe)] = nil }
-            }
+    private nonisolated(unsafe) static var alive: [ObjectIdentifier: HostPipe] = [:]
+    private static func keepAlive(_ pipe: HostPipe) {
+        alive[ObjectIdentifier(pipe)] = pipe
+        let previous = pipe.onExit
+        pipe.onExit = {
+            previous?()
+            DispatchQueue.main.async { alive[ObjectIdentifier(pipe)] = nil }
         }
     }
 }

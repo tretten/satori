@@ -515,9 +515,7 @@ final class Tab: ObservableObject, Identifiable {
     }
 
     private func escape(_ text: String) -> String {
-        text.replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "`", with: "\\`")
-            .replacingOccurrences(of: "$", with: "\\$")
+        (try? String(data: JSONEncoder().encode(text), encoding: .utf8)) ?? text
     }
     func pickingEnded() { onPickEnd?(self) }
     func pickingFailed(_ reason: String) { onPickTrouble?(self, reason) }

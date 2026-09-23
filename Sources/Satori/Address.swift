@@ -33,13 +33,7 @@ enum Address {
 
         // A local server almost never has a certificate, so https there is a
         // connection failure rather than a page.
-        let local = host == "localhost"
-            || host.hasSuffix(".localhost")
-            || host == "127.0.0.1"
-            || host == "0.0.0.0"
-            || host.hasPrefix("192.168.")
-            || host.hasPrefix("10.")
-        return URL(string: (local ? "http://" : "https://") + text)
+        return URL(string: (Dialogs.isLocal(host) ? "http://" : "https://") + text)
     }
 
     private static func looksLikeHost(_ host: String) -> Bool {

@@ -98,8 +98,6 @@ final class Updater: ObservableObject {
         Int(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "") ?? 0
     }
 
-    private var lastKey: String { "update.checked" }
-    /// Where a line goes when there is one to say, handed over at launch.
     private var say: ((String) -> Void)?
 
     private init() {
@@ -129,7 +127,7 @@ final class Updater: ObservableObject {
     private var clock: Timer?
 
     private func checkIfDue() {
-        let last = Store.settings.object(forKey: lastKey) as? Date ?? .distantPast
+        let last = Store.settings.object(forKey: "update.checked") as? Date ?? .distantPast
         guard Updater.overridden || Date().timeIntervalSince(last) > 60 * 60 * 20 else { return }
         check { _ in }
     }
@@ -145,7 +143,7 @@ final class Updater: ObservableObject {
             guard let self else { return }
             checking = false
             lastChecked = Date()
-            Store.settings.set(Date(), forKey: lastKey)
+            Store.settings.set(Date(), forKey: "update.checked")
             guard let found, found.build > Updater.build, found.runsHere else {
                 // A build already swapped in stays ready whatever the feed
                 // says now.
@@ -255,7 +253,7 @@ final class Updater: ObservableObject {
 /// scratch folder it made and the `.old` bundle it set aside.
 private enum Swap {
     enum Refused: Error {
-        case unsignedHere, readOnly, download, hash, archive, plist, wrongApp, notNewer, unsigned, wrongTeam, move
+        case failed
     }
 
     /// Where the bundle lives, and so where the new one goes.
@@ -272,11 +270,11 @@ private enum Swap {
         // No Team ID on this build means it was signed ad hoc — a development
         // build. Nothing is ever swapped in under an app that could not be
         // told apart from anything else.
-        guard let team = teamID(of: target) else { throw Refused.unsignedHere }
+        guard let team = teamID(of: target) else { throw Refused.failed }
         // The folder the app is in has to take a rename, or nothing here can
         // be done: /Applications owned by another account, a disk image.
         guard files.isWritableFile(atPath: target.deletingLastPathComponent().path) else {
-            throw Refused.readOnly
+            throw Refused.failed
         }
 
         // A scratch folder on the same volume as the app, so the last move is
@@ -290,13 +288,13 @@ private enum Swap {
         let zip = scratch.appendingPathComponent("Satori.zip")
         try await download(release.archive, to: zip)
         if let expected = release.sha256 {
-            guard try digest(of: zip) == expected else { throw Refused.hash }
+            guard try digest(of: zip) == expected else { throw Refused.failed }
         }
         let unpacked = scratch.appendingPathComponent("unpacked", isDirectory: true)
         try extract(zip, into: unpacked)
         guard let fresh = try files.contentsOfDirectory(at: unpacked, includingPropertiesForKeys: nil)
             .first(where: { $0.pathExtension == "app" })
-        else { throw Refused.archive }
+        else { throw Refused.failed }
         try verify(fresh, team: team)
         try swap(fresh)
     }
@@ -307,7 +305,7 @@ private enum Swap {
         request.timeoutInterval = 60
         let (got, response) = try await URLSession.shared.download(for: request)
         guard (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) ?? true else {
-            throw Refused.download
+            throw Refused.failed
         }
         // The session's copy lasts only until this returns.
         try FileManager.default.moveItem(at: got, to: file)
@@ -337,7 +335,7 @@ private enum Swap {
         ditto.standardError = FileHandle.nullDevice
         try ditto.run()
         ditto.waitUntilExit()
-        guard ditto.terminationStatus == 0 else { throw Refused.archive }
+        guard ditto.terminationStatus == 0 else { throw Refused.failed }
     }
 
     /// A bundle is not trusted because it arrived. It is trusted because it
@@ -347,20 +345,20 @@ private enum Swap {
         let plist = bundle.appendingPathComponent("Contents/Info.plist")
         guard let data = try? Data(contentsOf: plist),
               let info = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
-        else { throw Refused.plist }
+        else { throw Refused.failed }
         guard info["CFBundleIdentifier"] as? String == Bundle.main.bundleIdentifier else {
-            throw Refused.wrongApp
+            throw Refused.failed
         }
         guard Int(info["CFBundleVersion"] as? String ?? "") ?? 0 > Updater.build else {
-            throw Refused.notNewer
+            throw Refused.failed
         }
         var code: SecStaticCode?
         guard SecStaticCodeCreateWithPath(bundle as CFURL, [], &code) == errSecSuccess, let code else {
-            throw Refused.unsigned
+            throw Refused.failed
         }
         let strict = SecCSFlags(rawValue: kSecCSStrictValidate | kSecCSCheckAllArchitectures)
-        guard SecStaticCodeCheckValidity(code, strict, nil) == errSecSuccess else { throw Refused.unsigned }
-        guard teamID(of: bundle) == team else { throw Refused.wrongTeam }
+        guard SecStaticCodeCheckValidity(code, strict, nil) == errSecSuccess else { throw Refused.failed }
+        guard teamID(of: bundle) == team else { throw Refused.failed }
     }
 
     /// The team that signed a bundle, as the system reads it — nil for an
@@ -385,13 +383,13 @@ private enum Swap {
     private static func swap(_ fresh: URL) throws {
         let files = FileManager.default
         sweep()
-        guard !files.fileExists(atPath: aside.path) else { throw Refused.move }
+        guard !files.fileExists(atPath: aside.path) else { throw Refused.failed }
         try files.moveItem(at: target, to: aside)
         do {
             try files.moveItem(at: fresh, to: target)
         } catch {
             try? files.moveItem(at: aside, to: target)
-            throw Refused.move
+            throw Refused.failed
         }
     }
 

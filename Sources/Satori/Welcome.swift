@@ -100,7 +100,7 @@ struct WelcomePanel: View {
                 }
 
                 HStack(spacing: 12) {
-                    Big(bringing ? "Bringing…" : "Bring them in", filled: true) { bringAll() }
+                    Pill(bringing ? "Bringing…" : "Bring them in", filled: true, large: true) { bringAll() }
                         .disabled(bringing || brought != nil || !(wantsPasswords || wantsHistory || wantsBookmarks))
                     if bringing { Ring(size: 10) }
                     if let brought {
@@ -148,7 +148,7 @@ struct WelcomePanel: View {
                     .font(.system(size: 13))
                     .foregroundStyle(Palette.ink)
                 } else {
-                    Big("Make Satori the default", filled: true) {
+                    Pill("Make Satori the default", filled: true, large: true) {
                         asked = true
                         Links.becomeDefault { _ in isDefault = Links.isDefault }
                     }
@@ -168,9 +168,9 @@ struct WelcomePanel: View {
                     .textCase(.uppercase)
                     .tracking(0.6)
                     .padding(.top, 6)
-                Key("⌘T", "A new tab. Type a place, or words to search.")
-                Key("⌘K", "Every open tab, by name.")
-                Key("⌘,", "Settings, including passwords and updates.")
+                Shortcut("⌘T", "A new tab. Type a place, or words to search.", pill: true)
+                Shortcut("⌘K", "Every open tab, by name.", pill: true)
+                Shortcut("⌘,", "Settings, including passwords and updates.", pill: true)
             }
         }
     }
@@ -199,7 +199,7 @@ struct WelcomePanel: View {
                     .font(.system(size: 13))
                     .foregroundStyle(Palette.muted)
             }
-            Big(page < pages - 1 ? "Continue" : "Start browsing", filled: true) {
+            Pill(page < pages - 1 ? "Continue" : "Start browsing", filled: true, large: true) {
                 if page < pages - 1 { forward = true; page += 1 } else { finish() }
             }
             .keyboardShortcut(.defaultAction)
@@ -288,33 +288,6 @@ struct WelcomePanel: View {
         }
     }
 
-    private struct Big: View {
-        let title: String
-        var filled = false
-        let act: () -> Void
-        @State private var hovering = false
-
-        init(_ title: String, filled: Bool = false, act: @escaping () -> Void) {
-            self.title = title
-            self.filled = filled
-            self.act = act
-        }
-
-        var body: some View {
-            Button(action: act) {
-                Text(title)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(filled ? Palette.ground : Palette.ink)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 9)
-                    .background(filled ? Palette.ink : (hovering ? Palette.hover : Palette.wash), in: Capsule())
-                    .contentShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .onHover { hovering = $0 }
-        }
-    }
-
     private struct Choice: View {
         let title: String
         let detail: String
@@ -400,21 +373,4 @@ struct WelcomePanel: View {
         }
     }
 
-    private struct Key: View {
-        let keys: String
-        let what: String
-        init(_ keys: String, _ what: String) { self.keys = keys; self.what = what }
-        var body: some View {
-            HStack(spacing: 10) {
-                Text(keys)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(Palette.ink)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(Palette.wash, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    .frame(minWidth: 44)
-                Text(what).font(.system(size: 13)).foregroundStyle(Palette.muted)
-            }
-        }
-    }
 }

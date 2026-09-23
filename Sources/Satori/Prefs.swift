@@ -158,10 +158,6 @@ final class Preferences: ObservableObject {
         autocorrect = corrects
         // Before the first web view exists: WebKit reads these once.
         Preferences.tellWebKit(autocorrect: corrects)
-        // Left behind by an assistant this browser no longer has.
-        for key in ["mind.model", "mind.effort", "mind.acting", "mind.width", "mind.open"] {
-            store.removeObject(forKey: key)
-        }
     }
 
     /// WebKit's text checker takes its orders from the app's standard
