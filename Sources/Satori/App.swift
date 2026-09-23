@@ -16,7 +16,6 @@ struct SatoriApp: App {
                 .frame(minWidth: 640, minHeight: 420)
         }
         .windowStyle(.hiddenTitleBar)
-        .windowToolbarStyle(.unified)
         .defaultSize(width: 1180, height: 780)
         .commands {
             // One window. Tabs are the only kind of "new" there is.
@@ -225,18 +224,6 @@ private struct MenuLine: View {
     }
 }
 
-/// The toolbar's background, hidden where the OS lets it (15+). Below that
-/// the transparent title bar already shows nothing of its own.
-private struct HiddenToolbarBackground: ViewModifier {
-    func body(content: Content) -> some View {
-        if #available(macOS 15, *) {
-            content.toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
-        } else {
-            content
-        }
-    }
-}
-
 struct ContentView: View {
     @ObservedObject var browser: Browser
 
@@ -300,16 +287,6 @@ struct ContentView: View {
             }
         }
         .ignoresSafeArea()
-        // A toolbar for the frame it brings, Apple's own way (their
-        // Destination Video sample hides everything but the window controls
-        // the same way). One invisible item keeps it real; the row below it
-        // is the browser's own.
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Color.clear.frame(width: 1, height: 1)
-            }
-        }
-        .modifier(HiddenToolbarBackground())
         .animation(Motion.settle, value: browser.prefs.sidebar)
         .animation(.easeOut(duration: 0.12), value: browser.active?.immersed)
     }
