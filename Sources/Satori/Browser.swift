@@ -1799,9 +1799,28 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
 // MARK: - keeping files
 
 extension Browser: WKDownloadDelegate {
+    /// WebKit doesn't promise the main thread here: navigations call back on
+    /// it, but a download straight from a video element may not. The panel
+    /// below refuses off the main thread, silently cancelling the download —
+    /// so everything here goes through it first.
+    private func onMain(_ work: @escaping () -> Void) {
+        if Thread.isMainThread { work() } else { DispatchQueue.main.async(execute: work) }
+    }
+
     func download(
         _ download: WKDownload,
         decideDestinationUsing response: URLResponse,
+        suggestedFilename: String,
+        completionHandler: @escaping (URL?) -> Void
+    ) {
+        onMain {
+            self.decideDestination(of: download, response: response, suggestedFilename: suggestedFilename, completionHandler: completionHandler)
+        }
+    }
+
+    private func decideDestination(
+        of download: WKDownload,
+        response: URLResponse,
         suggestedFilename: String,
         completionHandler: @escaping (URL?) -> Void
     ) {
@@ -1827,6 +1846,10 @@ extension Browser: WKDownloadDelegate {
     }
 
     func downloadDidFinish(_ download: WKDownload) {
+        onMain { self.landed(download) }
+    }
+
+    private func landed(_ download: WKDownload) {
         downloading.removeAll { $0 === download }
         guard let file = download.progress.fileURL else {
             announce("Download finished")
@@ -1848,8 +1871,10 @@ extension Browser: WKDownloadDelegate {
         didFailWithError error: Error,
         resumeData: Data?
     ) {
-        downloading.removeAll { $0 === download }
-        announce("Download failed")
+        onMain {
+            self.downloading.removeAll { $0 === download }
+            self.announce("Download failed")
+        }
     }
 
     /// WebKit refuses to write over a file that is already there, so the name
