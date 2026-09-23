@@ -608,7 +608,7 @@ final class Extensions: NSObject, ObservableObject {
     static func describe(_ found: WKWebExtension, in folder: URL) -> [String] {
         var out: [String] = []
         // Leaving out what Satori itself added to the manifest.
-        let added = Set((try? JSONSerialization.jsonObject(with: Data(contentsOf: folder.appendingPathComponent(".search-added")))) as? [String] ?? [])
+        let added = Set((try? JSONSerialization.jsonObject(with: Data(contentsOf: folder.appendingPathComponent(".satori-added")))) as? [String] ?? [])
         let declared = Set(((try? JSONSerialization.jsonObject(with: Data(contentsOf: folder.appendingPathComponent("manifest.json")))) as? [String: Any])?["permissions"] as? [String] ?? [])
         let patterns = found.allRequestedMatchPatterns
         if patterns.contains(where: { $0.matchesAllHosts || $0.matchesAllURLs }) {
@@ -849,7 +849,7 @@ extension Extensions: WKWebExtensionControllerDelegate {
         ExtensionPopup.shared.show(url, for: context, from: anchor)
     }
 
-    /// `runtime.sendNativeMessage`. To "search" — the APIs WebKit doesn't
+    /// `runtime.sendNativeMessage`. To "satori" — the APIs WebKit doesn't
     /// have, answered by this app. To anything else — a Chrome native
     /// messaging host installed on this Mac, spoken to the way Chrome would.
     func webExtensionController(_ controller: WKWebExtensionController, sendMessage message: Any, toApplicationWithIdentifier applicationIdentifier: String?, for extensionContext: WKWebExtensionContext) async throws -> Any? {
@@ -952,7 +952,7 @@ final class ExtensionWindow: NSObject, WKWebExtensionWindow {
     init(owner: Extensions) { self.owner = owner }
 
     private var nsWindow: NSWindow? {
-        NSApp.windows.first { $0.isVisible && $0.contentView != nil && $0.frameAutosaveName == "search" }
+        NSApp.windows.first { $0.isVisible && $0.contentView != nil && $0.frameAutosaveName == "satori" }
             ?? NSApp.mainWindow
     }
 

@@ -24,8 +24,8 @@ import CryptoKit
 @MainActor
 enum ExtensionShims {
     /// The name native messages to the browser itself go to.
-    static let application = "search"
-    static let file = "search-shim.js"
+    static let application = "satori"
+    static let file = "satori-shim.js"
     /// The first line of a worker that already carries the shim.
     static let marker = "/* Satori: Chrome APIs WebKit lacks, filled in (ExtensionShims.swift) */"
     static let ender = "/* Satori: end of shim */"
@@ -35,7 +35,7 @@ enum ExtensionShims {
     /// Written beside a prepared extension: which shim it carries. The same
     /// one needs nothing redone, which matters at launch — preparing reads
     /// every script and page an extension ships.
-    static let stamp = ".search-shim"
+    static let stamp = ".satori-shim"
     static let version: String = {
         SHA256.hash(data: Data(script.utf8)).prefix(8).map { String(format: "%02x", $0) }.joined() + (Store.testing ? "-test" : "")
     }()
@@ -58,14 +58,14 @@ enum ExtensionShims {
         // described by what it asked for, not by what Satori gave it.
         var permissions = manifest["permissions"] as? [Any] ?? []
         let asked = Set(permissions.compactMap { $0 as? String })
-        var added = (try? JSONSerialization.jsonObject(with: Data(contentsOf: folder.appendingPathComponent(".search-added")))) as? [String] ?? []
+        var added = (try? JSONSerialization.jsonObject(with: Data(contentsOf: folder.appendingPathComponent(".satori-added")))) as? [String] ?? []
         for needed in ["nativeMessaging"] + (asked.contains("userScripts") ? ["scripting"] : []) where !asked.contains(needed) {
             permissions.append(needed)
             added.append(needed)
         }
         manifest["permissions"] = permissions
         if let data = try? JSONSerialization.data(withJSONObject: Array(Set(added)).sorted()) {
-            try? data.write(to: folder.appendingPathComponent(".search-added"))
+            try? data.write(to: folder.appendingPathComponent(".satori-added"))
         }
 
         // The background, whichever kind it is, gets the shim first. A
@@ -178,8 +178,8 @@ enum ExtensionShims {
       // code that needs them — every fetch of a Request, every import.
       const { URL, FileReader, Response, Blob, File, DOMException, HTMLImageElement, HTMLAnchorElement, Element } = root;
       const chrome = root.chrome || root.browser;
-      if (!chrome || root.__searchShim) return;
-      Object.defineProperty(root, "__searchShim", { value: true });
+      if (!chrome || root.__satoriShim) return;
+      Object.defineProperty(root, "__satoriShim", { value: true });
       // WebKit finds a page's extension APIs through the `chrome` and
       // `browser` globals when it delivers an event. A sandbox that locks
       // every global away (MetaMask's LavaMoat) cuts it off: nothing arrives
@@ -210,7 +210,7 @@ enum ExtensionShims {
       // `chrome.tabs` is a fresh object without what was set on it. So every
       // object touched here is held for good.
       const kept = new Set();
-      try { Object.defineProperty(root, "__searchKept", { value: kept }); } catch (e) {}
+      try { Object.defineProperty(root, "__satoriKept", { value: kept }); } catch (e) {}
       const put = (target, key, value) => {
         if (target && (typeof target === "object" || typeof target === "function")) kept.add(target);
         try { Object.defineProperty(target, key, { value, configurable: true, writable: true, enumerable: true }); }
@@ -242,7 +242,7 @@ enum ExtensionShims {
         try { callback(); } finally { try { delete runtime.lastError; } catch (e) {} }
       };
       const native = (api, args) =>
-        runtime.sendNativeMessage("search", { api, args: JSON.parse(JSON.stringify(args ?? [])) })
+        runtime.sendNativeMessage("satori", { api, args: JSON.parse(JSON.stringify(args ?? [])) })
           .then((reply) => {
             if (reply && reply.error) throw new Error(reply.error);
             return reply ? reply.value : undefined;
@@ -333,12 +333,12 @@ enum ExtensionShims {
           let settled = false, keep = false;
           const sendResponse = (value) => { if (!settled) { settled = true; respond(value); } };
           // Only the worker answers; any other page stays out of it.
-          if (message && message.__searchPing === true) {
+          if (message && message.__satoriPing === true) {
             if (background) { sendResponse("pong"); return; }
             return true;
           }
-          if (message && message.__searchUserScript === true) {
-            const route = root.__searchUserScriptMessage;
+          if (message && message.__satoriUserScript === true) {
+            const route = root.__satoriUserScriptMessage;
             return route && route(message.message, sender, sendResponse) && !settled ? true : undefined;
           }
           for (const listener of [...listeners]) {
@@ -417,7 +417,7 @@ enum ExtensionShims {
           // unanswered for reasons that pass. Waking a worker that runs
           // starts it over, so that is kept for last.
           const ping = Object.getPrototypeOf(runtime).sendMessage;
-          const ask = () => Promise.race([ping.call(runtime, { __searchPing: true }), new Promise((r) => setTimeout(() => r("late"), 15000))]).catch(() => undefined);
+          const ask = () => Promise.race([ping.call(runtime, { __satoriPing: true }), new Promise((r) => setTimeout(() => r("late"), 15000))]).catch(() => undefined);
           const pause = (ms) => new Promise((w) => setTimeout(w, ms));
           const tries = [() => ask(), () => pause(1000).then(ask), () => pause(1000).then(ask),
             () => native("background.wake", []).catch(() => {}).then(() => pause(1000)).then(ask)];
@@ -1177,7 +1177,7 @@ enum ExtensionShims {
         // Messages from the USER_SCRIPT world come tagged (see the file's
         // wrapper); they go to onUserScriptMessage and onUserScriptConnect.
         const onMessage = runtime.onUserScriptMessage, onConnect = runtime.onUserScriptConnect;
-        root.__searchUserScriptMessage = (message, sender, respond) => {
+        root.__satoriUserScriptMessage = (message, sender, respond) => {
           let keep = false;
           for (const f of [...onMessage.listeners]) {
             const r = f(message, sender, respond);
@@ -2216,7 +2216,7 @@ enum ExtensionShims {
         // MARK: search
         case "search.query":
             let spec = first as? [String: Any] ?? [:]
-            guard let url = Google.destination(for: spec["text"] as? String ?? "") else { return nil }
+            guard let url = Engine.destination(for: spec["text"] as? String ?? "") else { return nil }
             switch spec["disposition"] as? String {
             case "NEW_TAB", "NEW_WINDOW": browser.open(url, foreground: true)
             default: browser.visit(url)
@@ -2371,7 +2371,7 @@ enum ExtensionShims {
             const runtime = globalThis.chrome.runtime;
             return { runtime: {
               id: runtime.id, getURL: (path) => runtime.getURL(path), get lastError() { return runtime.lastError; },
-              sendMessage: (message, ...rest) => runtime.sendMessage({ __searchUserScript: true, message }, ...rest.filter((r) => typeof r === "function" || (r && typeof r === "object"))),
+              sendMessage: (message, ...rest) => runtime.sendMessage({ __satoriUserScript: true, message }, ...rest.filter((r) => typeof r === "function" || (r && typeof r === "object"))),
               connect: (info) => runtime.connect({ ...(info || {}), name: "search-us:" + ((info && info.name) || "") }),
             } };
           })();
@@ -2380,10 +2380,10 @@ enum ExtensionShims {
         let text = #"""
         /* Satori: a user script (chrome.userScripts) */
         search_user_script: {
-          const __searchHref = location.href;
-          const __searchGlob = (g) => new RegExp("^" + g.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".") + "$");
-          const __searchIn = \#(json(script["includeGlobs"] ?? [])), __searchOut = \#(json(script["excludeGlobs"] ?? []));
-          if ((__searchIn.length && !__searchIn.some((g) => __searchGlob(g).test(__searchHref))) || __searchOut.some((g) => __searchGlob(g).test(__searchHref))) break search_user_script;
+          const __satoriHref = location.href;
+          const __satoriGlob = (g) => new RegExp("^" + g.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".") + "$");
+          const __satoriIn = \#(json(script["includeGlobs"] ?? [])), __satoriOut = \#(json(script["excludeGlobs"] ?? []));
+          if ((__satoriIn.length && !__satoriIn.some((g) => __satoriGlob(g).test(__satoriHref))) || __satoriOut.some((g) => __satoriGlob(g).test(__satoriHref))) break search_user_script;
         \#(userWorld ? prelude : "")
         \#(code)
         }

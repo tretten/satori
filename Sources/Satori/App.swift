@@ -592,7 +592,7 @@ struct ContentView: View {
         // own: the name lives in the app's standard defaults, which every
         // copy shares, and a probe resized for a test once changed the size
         // the real window came back at.
-        window.setFrameAutosaveName(Store.world.map { "satori (\($0))" } ?? "search")
+        window.setFrameAutosaveName(Store.world.map { "satori (\($0))" } ?? "satori")
 
         // The traffic lights set in from the corner and centred in the strip's
         // height, in both modes, without a toolbar's rounder corners — see

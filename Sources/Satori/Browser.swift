@@ -557,7 +557,7 @@ final class Browser: NSObject, ObservableObject {
 
     func commitTabEdit() {
         guard let id = editingTab, let tab = tabs.first(where: { $0.id == id }) else { return }
-        guard let url = Google.destination(for: tabDraft) else {
+        guard let url = Engine.destination(for: tabDraft) else {
             // Stay put and say so, rather than quietly throwing the edit away.
             refusals += 1
             return
@@ -1160,7 +1160,7 @@ final class Browser: NSObject, ObservableObject {
     /// ⌘⇧V. What is in the clipboard, if it is a place — or a search.
     func pasteAndGo() {
         guard let text = NSPasteboard.general.string(forType: .string),
-              let url = Google.destination(for: text.trimmingCharacters(in: .whitespacesAndNewlines))
+              let url = Engine.destination(for: text.trimmingCharacters(in: .whitespacesAndNewlines))
         else {
             refusals += 1
             return
@@ -1381,9 +1381,9 @@ final class Browser: NSObject, ObservableObject {
         // Last in the list, and only when what was typed cannot be a place.
         if !typed.isEmpty,
            Address.url(from: typed) == nil,
-           let asked = Google.url(for: typed) {
+           let asked = Engine.url(for: typed) {
             list.append(
-                Suggestion(key: typed, title: Google.name, url: asked, kind: .search)
+                Suggestion(key: typed, title: Engine.current.title, url: asked, kind: .search)
             )
         }
         offers = list
@@ -1511,7 +1511,7 @@ final class Browser: NSObject, ObservableObject {
         } else if ending != nil {
             target = Address.url(from: completed)
         } else {
-            target = Google.destination(for: typed)
+            target = Engine.destination(for: typed)
         }
 
         guard let url = target else {

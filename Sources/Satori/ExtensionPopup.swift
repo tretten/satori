@@ -150,7 +150,7 @@ final class ExtensionPopup: NSObject, WKUIDelegate, WKNavigationDelegate, NSPopo
     () => {
       const d = document.documentElement;
       if (!d) return null;
-      const m = window.__searchSizing || (window.__searchSizing = {});
+      const m = window.__satoriSizing || (window.__satoriSizing = {});
       const saved = d.getAttribute("style");
       const back = () => saved === null ? d.removeAttribute("style") : d.setAttribute("style", saved);
       const box = d.getBoundingClientRect();

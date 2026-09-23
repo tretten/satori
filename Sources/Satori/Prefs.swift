@@ -106,6 +106,10 @@ final class Preferences: ObservableObject {
             Preferences.tellWebKit(autocorrect: autocorrect)
         }
     }
+    /// Words that aren't a place go here. Google unless asked otherwise.
+    @Published var engine: Engine {
+        didSet { store.set(engine.rawValue, forKey: "engine") }
+    }
 
     init() {
         // Carried over from when there were four ways of holding the browser
@@ -158,6 +162,7 @@ final class Preferences: ObservableObject {
         autocorrect = corrects
         // Before the first web view exists: WebKit reads these once.
         Preferences.tellWebKit(autocorrect: corrects)
+        engine = Engine(rawValue: store.string(forKey: "engine") ?? "") ?? .google
     }
 
     /// WebKit's text checker takes its orders from the app's standard

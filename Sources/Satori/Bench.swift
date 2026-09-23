@@ -336,7 +336,7 @@ final class Bench {
             guard let tab = find(request, in: browser) else { answer(missing(request)); return }
             house(tab)
             let path = (request["path"] as? String)
-                ?? NSTemporaryDirectory() + "search-bench-\(Bench.short(tab)).png"
+                ?? NSTemporaryDirectory() + "satori-bench-\(Bench.short(tab)).png"
             let width = request["width"] as? Double
             shoot(tab, to: URL(fileURLWithPath: path), width: width, answer)
 

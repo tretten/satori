@@ -15,15 +15,16 @@ struct SettingsPanel: View {
     @State private var page: Page = Page(rawValue: Store.settings.string(forKey: "settings.page") ?? "") ?? .general
 
     enum Page: String, CaseIterable, Identifiable {
-        case general, tabs, extensions, passwords, downloads, privacy, about
+        case general, tabs, search, extensions, passwords, shortcuts, privacy, about
         var id: String { rawValue }
         var title: String {
             switch self {
             case .general: return "General"
             case .tabs: return "Tabs"
+            case .search: return "Search"
             case .extensions: return "Extensions"
             case .passwords: return "Passwords"
-            case .downloads: return "Downloads"
+            case .shortcuts: return "Shortcuts"
             case .privacy: return "Privacy"
             case .about: return "About"
             }
@@ -32,9 +33,10 @@ struct SettingsPanel: View {
             switch self {
             case .general: return "macwindow"
             case .tabs: return "rectangle.split.3x1"
+            case .search: return "magnifyingglass"
             case .extensions: return "puzzlepiece.extension"
             case .passwords: return "key"
-            case .downloads: return "arrow.down.circle"
+            case .shortcuts: return "keyboard"
             case .privacy: return "hand.raised"
             case .about: return "info.circle"
             }
@@ -133,9 +135,10 @@ struct SettingsPanel: View {
                     switch page {
                     case .general: general
                     case .tabs: tabs
+                    case .search: search
                     case .extensions: ExtensionsPage(browser: browser)
                     case .passwords: passwords
-                    case .downloads: downloads
+                    case .shortcuts: shortcuts
                     case .privacy: privacy
                     case .about: about
                     }
@@ -182,6 +185,14 @@ struct SettingsPanel: View {
             Rule()
             Line("Let a script drive Satori", "A local socket for testing. Its tabs open beside yours with a flask on them and never take over — see ./bench") {
                 Switch(on: $prefs.bench)
+            }
+            Rule()
+            Line("Save downloads to", prefs.downloads.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")) {
+                Pill("Change…") { chooseFolder() }
+            }
+            Rule()
+            Line("Ask where to save each file") {
+                Switch(on: $prefs.asksWhereToSave)
             }
         }
     }
@@ -264,17 +275,43 @@ struct SettingsPanel: View {
         }
     }
 
-    // MARK: - downloads
+    // MARK: - search
 
-    private var downloads: some View {
+    private var search: some View {
         Card {
-            Line("Save to", prefs.downloads.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")) {
-                Pill("Change…") { chooseFolder() }
+            ForEach(Array(Engine.allCases.enumerated()), id: \.element.id) { index, engine in
+                if index > 0 { Rule() }
+                Line(engine.title) {
+                    if prefs.engine == engine {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Palette.ink)
+                            .frame(width: 24)
+                    } else {
+                        Pill("Use") { prefs.engine = engine }
+                    }
+                }
             }
+        }
+    }
+
+    // MARK: - shortcuts
+
+    private var shortcuts: some View {
+        Card {
+            Shortcut("⌘L", "Address")
             Rule()
-            Line("Ask where to save each file") {
-                Switch(on: $prefs.asksWhereToSave)
-            }
+            Shortcut("⌘K", "Switch tab")
+            Rule()
+            Shortcut("⌘T  ⌘W  ⇧⌘T", "New, close, reopen tab")
+            Rule()
+            Shortcut("⇧⌘S", "Tabs in a sidebar")
+            Rule()
+            Shortcut("⇧⌘R", "Reading mode")
+            Rule()
+            Shortcut("⇧⌘H", "Hide something on this site")
+            Rule()
+            Shortcut("⇧⌘P", "Float the video")
         }
     }
 
@@ -351,22 +388,6 @@ struct SettingsPanel: View {
                 Line("Found something wrong?", "Opens a draft with the version already in it") {
                     Pill("Send Feedback") { Links.writeFeedback() }
                 }
-            }
-
-            Card {
-                Shortcut("⌘L", "Address")
-                Rule()
-                Shortcut("⌘K", "Switch tab")
-                Rule()
-                Shortcut("⌘T  ⌘W  ⇧⌘T", "New, close, reopen tab")
-                Rule()
-                Shortcut("⇧⌘S", "Tabs in a sidebar")
-                Rule()
-                Shortcut("⇧⌘R", "Reading mode")
-                Rule()
-                Shortcut("⇧⌘H", "Hide something on this site")
-                Rule()
-                Shortcut("⇧⌘P", "Float the video")
             }
         }
     }
