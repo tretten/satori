@@ -39,7 +39,7 @@ struct SideBar: View {
 
             // The band the lights sit in is this mode's title bar: the window
             // is dragged by it and a double-click fills the screen with it,
-            // everywhere but over the three doors, which take their own
+            // everywhere but over the two doors, which take their own
             // clicks. The lights are the title bar's own and answer first.
             HStack(spacing: 0) {
                 DragStrip()
@@ -52,8 +52,8 @@ struct SideBar: View {
             .frame(height: Metrics.strip)
 
             VStack(alignment: .leading, spacing: 0) {
-                // The traffic lights' corner, with back, forward and reload
-                // sitting right of them — the same three doors as the top
+                // The traffic lights' corner, with back and forward
+                // sitting right of them — the same two doors as the top
                 // bar, moved beside the lights since there's no far end of a
                 // row to put them at in this mode.
                 HStack(spacing: 0) {

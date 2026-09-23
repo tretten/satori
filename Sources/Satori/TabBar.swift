@@ -216,7 +216,7 @@ struct TabBar: View {
 
     /// The strip, less the lights, the plus, the doors at the far end and
     /// the air around them. The doors are measured; until they have been,
-    /// the three of the helm and the bookmarks stand in for them.
+    /// the two of the helm and the bookmarks stand in for them.
     private func room(in strip: CGFloat) -> CGFloat {
         let far = doors > 0 ? doors : 26
         return max(0, strip - Metrics.lights - 12 - Metrics.plusWidth - far - 3 * Metrics.tabGap)
@@ -237,10 +237,10 @@ struct TabBar: View {
     }
 }
 
-/// Back, forward, reload. They watch the live tab, not the window: whether
+/// Back, forward. They watch the live tab, not the window: whether
 /// there is anywhere to go back to is the tab's to say, and it changes with
-/// every page. Used here and, beside the traffic lights instead of at the
-/// far end of the row, in the sidebar.
+/// every page. Reload lives in the tab itself now. Used here and, beside
+/// the traffic lights instead of at the far end of the row, in the sidebar.
 struct Helm: View {
     @ObservedObject var browser: Browser
 
@@ -248,12 +248,11 @@ struct Helm: View {
         if let tab = browser.active {
             Wheel(browser: browser, tab: tab)
         } else {
-            // Nowhere to go and nothing to reload: the doors stay in place,
-            // greyed, so the row doesn't shift when a tab arrives.
+            // Nowhere to go: the doors stay in place, greyed, so the row
+            // doesn't shift when a tab arrives.
             HStack(spacing: 2) {
                 Door(icon: "chevron.left") {}
                 Door(icon: "chevron.right") {}
-                Door(icon: "arrow.clockwise") {}
             }
             .opacity(0.3)
             .allowsHitTesting(false)
@@ -274,19 +273,9 @@ struct Helm: View {
                 Door(icon: "chevron.right", help: "Forward   ⌘]") { browser.forward() }
                     .disabled(!forward)
                     .opacity(forward ? 1 : 0.3)
-                // Reload, or stop while it is still coming.
-                Door(
-                    icon: tab.loading ? "xmark" : "arrow.clockwise",
-                    help: tab.loading ? "Stop   ⌘." : "Reload   ⌘R"
-                ) {
-                    if tab.loading { tab.stop() } else { browser.reload() }
-                }
-                .disabled(tab.isBlank)
-                .opacity(tab.isBlank ? 0.3 : 1)
             }
             .animation(Motion.quick, value: back)
             .animation(Motion.quick, value: forward)
-            .animation(Motion.quick, value: tab.loading)
         }
     }
 }
@@ -454,9 +443,29 @@ private struct TabPill: View {
                     },
                     finish: { browser.cancelTabEdit() })
                     .frame(height: 16)
-            } else {
-                if prefs.glyph == .icons, !tab.isBlank {
-                    Mark(icon: tab.icon, letter: tab.monogram, size: 15)
+            } else if hovering || (prefs.glyph == .icons && !tab.isBlank) {
+                // The close lives where the mark was: the face swaps for
+                // a cross under the hand, and the tap swaps with it.
+                ZStack {
+                    if hovering {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundStyle(Palette.muted)
+                            .frame(width: 15, height: 15)
+                            .background(Palette.ink.opacity(0.07), in: Circle())
+                            .transition(.opacity)
+                    } else if prefs.glyph == .icons, !tab.isBlank {
+                        Mark(icon: tab.icon, letter: tab.monogram, size: 15)
+                    }
+                }
+                .frame(width: 15, height: 15)
+                .overlay {
+                    if hovering {
+                        Color.clear
+                            .frame(width: 24, height: 28)
+                            .contentShape(Rectangle())
+                            .onTapGesture { close() }
+                    }
                 }
                 if tab.bench {
                     // A script's tab, not yours.
@@ -480,18 +489,27 @@ private struct TabPill: View {
             Spacer(minLength: 2)
 
             // Pinned to the right-hand end of the pill, not trailing the title.
-            // One slot doing two jobs: the cross when the pointer is here, the
-            // ring while the page is still coming, never both.
+            // One slot doing two jobs: the arrow once the page is in, the
+            // ring while it is still coming (a tap stops it), never both.
             ZStack {
-                if hovering {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 8, weight: .semibold))
+                if tab.loading {
+                    if hovering {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundStyle(Palette.muted)
+                            .frame(width: 15, height: 15)
+                            .transition(.opacity)
+                            .help("Stop   ⌘.")
+                    } else {
+                        Ring().transition(.opacity)
+                    }
+                } else if hovering || live {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 8, weight: .medium))
                         .foregroundStyle(Palette.muted)
                         .frame(width: 15, height: 15)
-                        .background(Palette.ink.opacity(0.07), in: Circle())
                         .transition(.opacity)
-                } else if tab.loading {
-                    Ring().transition(.opacity)
+                        .help("Reload   ⌘R")
                 } else if tab.noisy {
                     // Which tab the noise is coming from. ⌘⇧M stops it.
                     Image(systemName: "speaker.wave.2.fill")
@@ -502,7 +520,7 @@ private struct TabPill: View {
             }
             .frame(width: editing ? 0 : 15, height: 15)
             .opacity(editing ? 0 : 1)
-            // The cross is 15 points across because that is how big it should
+            // The glyph is 15 points across because that is how big it should
             // look. What you have to hit is the whole right-hand end of the
             // tab: an overlay is not laid out, so it can reach past its own
             // frame without moving anything that is.
@@ -511,7 +529,10 @@ private struct TabPill: View {
                     Color.clear
                         .frame(width: 30, height: 28)
                         .contentShape(Rectangle())
-                        .onTapGesture { if hovering { close() } }
+                        .onTapGesture {
+                            if tab.loading { tab.stop() }
+                            else if hovering || live { tab.reload() }
+                        }
                 }
             }
             .animation(Motion.quick, value: hovering)
