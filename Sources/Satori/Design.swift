@@ -86,8 +86,8 @@ enum Metrics {
     /// The tab strip. The window's title bar is grown to match it so the
     /// traffic lights come down with the tabs — otherwise giving the row room
     /// to breathe just leaves it sitting below three buttons it used to line
-    /// up with.
-    static let strip: CGFloat = 44
+    /// up with. Safari-tall: 48 points, 96 pixels on retina.
+    static let strip: CGFloat = 48
     /// The page floats on the ground with air around it.
     static let pageInset: CGFloat = 8
     static let pageRadius: CGFloat = 10

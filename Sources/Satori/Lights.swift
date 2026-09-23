@@ -17,7 +17,7 @@ final class Lights: NSObject {
     /// Where the close button's centre goes, from the window's top-left: set
     /// in tighter than a unified toolbar would, which Metrics.lights and
     /// sideLights are measured from.
-    static let centre = CGPoint(x: 21, y: 22)
+    static let centre = CGPoint(x: 21, y: 24)
 
     private static var kept: [ObjectIdentifier: Lights] = [:]
 
@@ -35,9 +35,11 @@ final class Lights: NSObject {
     /// by request.
     private let spacing: CGFloat = 20
 
-    /// AppKit draws the circle smaller than the frame it is given, so the
-    /// frame overshoots — and sits tighter than Safari's, by request.
-    private static let natural = NSSize(width: 18, height: 18)
+    /// The buttons' own size. AppKit draws the circle at a fixed size no
+    /// frame forcing changes — only the bezel around it follows the frame,
+    /// which is the ring that made forced buttons look bigger while the
+    /// circles stayed put. So the frame hugs Safari's 14 instead.
+    private static let natural = NSSize(width: 14, height: 14)
 
     private init(_ window: NSWindow, moved: @escaping () -> Void) {
         self.window = window
