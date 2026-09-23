@@ -596,14 +596,6 @@ struct ContentView: View {
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.backgroundColor = Palette.NS.ground
-        // Rounder than the 17.5 AppKit draws on a window with no toolbar:
-        // the frame is masked to the guideline corner. Everything drawn —
-        // lights, tabs, page — lives inside the frame, so it rounds along.
-        if let frame = window.contentView?.superview {
-            frame.wantsLayer = true
-            frame.layer?.cornerRadius = Metrics.windowRadius
-            frame.layer?.masksToBounds = true
-        }
         // The strip does the dragging, so the page underneath can't be grabbed
         // by accident while selecting text.
         window.isMovableByWindowBackground = false

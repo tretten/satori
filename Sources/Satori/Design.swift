@@ -88,9 +88,7 @@ enum Metrics {
     /// to breathe just leaves it sitting below three buttons it used to line
     /// up with.
     static let strip: CGFloat = 44
-    /// The window's own corners, masked past the 17.5 AppKit draws without
-    /// a toolbar. And the page, floating on the ground with air around it.
-    static let windowRadius: CGFloat = 24
+    /// The page floats on the ground with air around it.
     static let pageInset: CGFloat = 8
     static let pageRadius: CGFloat = 10
 
