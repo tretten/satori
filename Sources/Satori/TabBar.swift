@@ -1,18 +1,5 @@
 import SwiftUI
 
-/// Ink for the tab row when the site paints it: white on dark theme-colors,
-/// the app's own ink everywhere else (nil).
-private struct ChromeInkKey: EnvironmentKey {
-    static let defaultValue: Color? = nil
-}
-
-extension EnvironmentValues {
-    var chromeInk: Color? {
-        get { self[ChromeInkKey.self] }
-        set { self[ChromeInkKey.self] = newValue }
-    }
-}
-
 /// The only chrome there is. Titles, one of them in a grey pill, and the pill
 /// slides from the tab you left to the tab you picked rather than blinking out
 /// of one and into the other.
@@ -40,12 +27,6 @@ struct TabBar: View {
         // themselves halfway down it.
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                // The page's own color, wall to wall: the bar becomes the
-                // site the way Dia does it. Ink for it comes down with the
-                // row, white on dark colors.
-                if let theme = browser.chromeTheme, let tint = Metrics.Theme.color(theme) {
-                    Rectangle().fill(tint)
-                }
                 // The empty half of the strip is what you grab to move the
                 // window; the tabs keep the run they sit on.
                 DragStrip(reserved: Metrics.lights + Metrics.helm + Metrics.tabGap + run(in: geo.size.width) + Metrics.tabGap + Metrics.plusWidth, trailing: 26 + 24)
@@ -109,7 +90,7 @@ struct TabBar: View {
                     Button { browser.newTab() } label: {
                         Image(systemName: "plus")
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(browser.chromeDark ? .white.opacity(0.65) : Palette.muted)
+                            .foregroundStyle(Palette.muted)
                             .frame(width: 15, height: 15)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 6)
@@ -145,7 +126,6 @@ struct TabBar: View {
                         }
                     }
                 }
-                .environment(\.chromeInk, browser.chromeDark ? .white : nil)
                 // The traffic lights are the system's. The row starts after
                 // them and stays there — nothing here moves to get out of
                 // their way, because nothing here was ever in it.
@@ -324,7 +304,6 @@ private struct TabPill: View {
 
     @State private var hovering = false
     @State private var shake: CGFloat = 0
-    @Environment(\.chromeInk) private var chromeInk
 
     private var editing: Bool { browser.editingTab == tab.id }
     private var pinned: Bool { tab.pin != nil && !editing }
@@ -583,8 +562,8 @@ private struct TabPill: View {
         return hovering ? ink.opacity(0.7) : muted
     }
 
-    private var ink: Color { chromeInk ?? Palette.ink }
-    private var muted: Color { chromeInk?.opacity(0.65) ?? Palette.muted }
+    private var ink: Color { Palette.ink }
+    private var muted: Color { Palette.muted }
 }
 
 /// The address in a tab, the letter on a pin: one AppKit field for the two

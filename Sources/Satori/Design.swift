@@ -92,36 +92,6 @@ enum Metrics {
     /// the strip.
     static let pageInset: CGFloat = 0
     static let pageRadius: CGFloat = 4
-
-/// A page's theme-color, parsed where it is worn. #rgb and #rrggbb; anything
-/// else is no color, and the bar stays the ground it always was.
-enum Theme {
-    static func color(_ raw: String?) -> Color? {
-        guard let (red, green, blue) = rgb(raw) else { return nil }
-        return Color(red: red, green: green, blue: blue)
-    }
-
-    /// Black 0 to white 1, for picking the ink that reads on it. Nil when
-    /// there is no color to read on.
-    static func luminance(_ raw: String?) -> Double? {
-        guard let (red, green, blue) = rgb(raw) else { return nil }
-        return 0.2126 * red + 0.7152 * green + 0.0722 * blue
-    }
-
-    private static func rgb(_ raw: String?) -> (Double, Double, Double)? {
-        guard var hex = raw?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
-              hex.hasPrefix("#")
-        else { return nil }
-        hex.removeFirst()
-        if hex.count == 3 { hex = hex.map { "\($0)\($0)" }.joined() }
-        guard hex.count == 6, let rgb = UInt(hex, radix: 16) else { return nil }
-        return (
-            Double((rgb >> 16) & 0xff) / 255,
-            Double((rgb >> 8) & 0xff) / 255,
-            Double(rgb & 0xff) / 255
-        )
-    }
-}
     /// Where the first tab starts. The traffic lights run from 12 to 106 —
     /// measured, not guessed — so this leaves them the same air on their right
     /// that the window gives them on their left.

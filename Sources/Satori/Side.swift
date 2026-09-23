@@ -577,9 +577,8 @@ struct Door: View {
 
     @State private var hovering = false
 
-    @Environment(\.chromeInk) private var chromeInk
-    private var ink: Color { chromeInk ?? Palette.ink }
-    private var muted: Color { chromeInk?.opacity(0.65) ?? Palette.muted }
+    private var ink: Color { Palette.ink }
+    private var muted: Color { Palette.muted }
 
     var body: some View {
         Button(action: act) {
