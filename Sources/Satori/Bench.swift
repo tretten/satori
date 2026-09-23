@@ -388,6 +388,7 @@ final class Bench {
                 out["lights"] = Bench.lights(of: window)
                 out["lightSize"] = Bench.lightSize(of: window)
                 out["resting"] = Bench.resting(of: window)
+                out["toolbar"] = window.toolbar != nil
             }
             out["keysQuieted"] = PageView.quieted
             answer(out)
