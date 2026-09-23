@@ -17,7 +17,7 @@ final class Lights: NSObject {
     /// Where the close button's centre goes, from the window's top-left: set
     /// in tighter than a unified toolbar would, which Metrics.lights and
     /// sideLights are measured from.
-    static let centre = CGPoint(x: 18, y: 22)
+    static let centre = CGPoint(x: 26, y: 22)
 
     private static var kept: [ObjectIdentifier: Lights] = [:]
 
@@ -60,8 +60,10 @@ final class Lights: NSObject {
             centre.addObserver(self, selector: #selector(place), name: name, object: window)
         }
         // The title bar's own views moving is the surest sign AppKit has just
-        // laid them out again.
+        // laid them out again. The buttons take a fixed frame: left to the
+        // bar's resizing they stretch with it, into ovals.
         let buttons = self.buttons
+        buttons.forEach { $0.autoresizingMask = [] }
         if let bar = buttons.first?.superview, let container = bar.superview {
             for view in [container, bar] + buttons {
                 view.postsFrameChangedNotifications = true
