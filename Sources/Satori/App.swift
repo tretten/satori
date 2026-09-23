@@ -596,6 +596,15 @@ struct ContentView: View {
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.backgroundColor = Palette.NS.ground
+        // A toolbar for the frame it brings: with one, AppKit draws the
+        // standard radius (mid-twenties); without, this window gets 17.5.
+        // It carries no items — the row below it is the browser's own — and
+        // no separator line across it.
+        let toolbar = NSToolbar(identifier: "Satori")
+        toolbar.displayMode = .iconOnly
+        window.toolbarStyle = .unified
+        window.toolbar = toolbar
+        window.titlebarSeparatorStyle = .none
         // The strip does the dragging, so the page underneath can't be grabbed
         // by accident while selecting text.
         window.isMovableByWindowBackground = false
