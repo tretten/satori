@@ -577,11 +577,15 @@ struct Door: View {
 
     @State private var hovering = false
 
+    @Environment(\.chromeInk) private var chromeInk
+    private var ink: Color { chromeInk ?? Palette.ink }
+    private var muted: Color { chromeInk?.opacity(0.65) ?? Palette.muted }
+
     var body: some View {
         Button(action: act) {
             Image(systemName: icon)
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(on ? Palette.ink : (hovering ? Palette.ink.opacity(0.7) : Palette.muted))
+                .foregroundStyle(on ? ink : (hovering ? ink.opacity(0.7) : muted))
                 .frame(width: 26, height: 26)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)

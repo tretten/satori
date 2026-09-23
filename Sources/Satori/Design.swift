@@ -94,22 +94,32 @@ enum Metrics {
     static let pageRadius: CGFloat = 4
 
 /// A page's theme-color, parsed where it is worn. #rgb and #rrggbb; anything
-/// else is no color, and the bar stays the ground it always was. Dark colors
-/// are refused too: breathed onto the row they turn the strip to mud and draw
-/// a hard edge where it meets the page.
+/// else is no color, and the bar stays the ground it always was.
 enum Theme {
     static func color(_ raw: String?) -> Color? {
+        guard let (red, green, blue) = rgb(raw) else { return nil }
+        return Color(red: red, green: green, blue: blue)
+    }
+
+    /// Black 0 to white 1, for picking the ink that reads on it. Nil when
+    /// there is no color to read on.
+    static func luminance(_ raw: String?) -> Double? {
+        guard let (red, green, blue) = rgb(raw) else { return nil }
+        return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+    }
+
+    private static func rgb(_ raw: String?) -> (Double, Double, Double)? {
         guard var hex = raw?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
               hex.hasPrefix("#")
         else { return nil }
         hex.removeFirst()
         if hex.count == 3 { hex = hex.map { "\($0)\($0)" }.joined() }
         guard hex.count == 6, let rgb = UInt(hex, radix: 16) else { return nil }
-        let red = Double((rgb >> 16) & 0xff) / 255
-        let green = Double((rgb >> 8) & 0xff) / 255
-        let blue = Double(rgb & 0xff) / 255
-        guard 0.2126 * red + 0.7152 * green + 0.0722 * blue > 0.45 else { return nil }
-        return Color(red: red, green: green, blue: blue)
+        return (
+            Double((rgb >> 16) & 0xff) / 255,
+            Double((rgb >> 8) & 0xff) / 255,
+            Double(rgb & 0xff) / 255
+        )
     }
 }
     /// Where the first tab starts. The traffic lights run from 12 to 106 —

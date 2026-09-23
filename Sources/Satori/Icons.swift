@@ -255,6 +255,8 @@ struct Mark: View {
     var size: CGFloat = 16
     var dim = false
 
+    @Environment(\.chromeInk) private var chromeInk
+
     var body: some View {
         Group {
             if let icon {
@@ -266,7 +268,7 @@ struct Mark: View {
             } else {
                 Text(letter)
                     .font(.system(size: size * 0.56, weight: .medium))
-                    .foregroundStyle(Palette.muted)
+                    .foregroundStyle(chromeInk?.opacity(0.65) ?? Palette.muted)
                     .frame(width: size, height: size)
                     .background(
                         RoundedRectangle(cornerRadius: size * 0.22, style: .continuous)

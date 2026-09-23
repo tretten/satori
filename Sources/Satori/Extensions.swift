@@ -1063,6 +1063,8 @@ private struct ExtensionIcon: View {
     let button: Extensions.Button
     let size: CGFloat
 
+    @Environment(\.chromeInk) private var chromeInk
+
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             Group {
@@ -1073,7 +1075,7 @@ private struct ExtensionIcon: View {
                     // pass for the button the list opens from.
                     Text(button.name.first.map { String($0).uppercased() } ?? "?")
                         .font(.system(size: size * 0.62, weight: .semibold))
-                        .foregroundStyle(Palette.muted)
+                        .foregroundStyle(chromeInk?.opacity(0.65) ?? Palette.muted)
                         .frame(width: size, height: size)
                         .background(RoundedRectangle(cornerRadius: size * 0.28, style: .continuous).fill(Palette.wash))
                 }

@@ -615,6 +615,15 @@ final class Browser: NSObject, ObservableObject {
     var downloading: [WKDownload] = []
     /// The theme-color of the page in front, breathed onto the tab row.
     @Published var chromeTheme: String?
+    /// White ink for it when the color runs dark. Set together with the
+    /// color, never alone.
+    @Published var chromeDark = false
+
+    /// Wear this color on the row, and the ink that reads on it.
+    private func wear(_ theme: String?) {
+        chromeTheme = theme
+        chromeDark = (Metrics.Theme.luminance(theme) ?? 1) < 0.5
+    }
     /// The Chrome Web Store's pages, told when installs come and go. See StoreRelay.swift.
     var storeWatch: AnyCancellable?
     private var hush: AnyCancellable?
@@ -912,7 +921,7 @@ final class Browser: NSObject, ObservableObject {
         if floating == tab.id { land() }
         leaving()
         activeID = tab.id
-        chromeTheme = tab.theme
+        wear(tab.theme)
         tab.touch()
         // A tab brought back from last time, or waking from ⌘W while pinned,
         // opens the moment you look at it — and only if there was nothing to
@@ -1745,7 +1754,7 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
             guard let self else { return }
             let theme = value as? String
             tab.theme = theme
-            if tab.id == self.activeID { self.chromeTheme = theme }
+            if tab.id == self.activeID { self.wear(theme) }
         }
         // A tab waking from sleep: the new document is in, and a moment
         // after it is on screen the picture of the old one can go.
