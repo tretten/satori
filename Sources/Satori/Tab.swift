@@ -85,6 +85,9 @@ final class Tab: ObservableObject, Identifiable {
     @Published var failure: String?
     /// The error behind it, for the small print under the message.
     @Published var failureCode: String?
+    /// The page's theme-color, as written — resolved where it is worn, and
+    /// restored to the row when this tab comes back.
+    var theme: String?
     /// How far down the page you are, nought to one. The tab's own pill fills
     /// with it.
     @Published var reading: Double = 0

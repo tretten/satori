@@ -27,6 +27,12 @@ struct TabBar: View {
         // themselves halfway down it.
         GeometryReader { geo in
             ZStack(alignment: .leading) {
+                // The page's own color, breathed onto the row: theme-color at
+                // less than half over the ground, so the bar leans into the
+                // site while ink stays ink on it.
+                if let theme = browser.chromeTheme, let tint = Metrics.Theme.color(theme) {
+                    Rectangle().fill(tint.opacity(0.4))
+                }
                 // The empty half of the strip is what you grab to move the
                 // window; the tabs keep the run they sit on.
                 DragStrip(reserved: Metrics.lights + Metrics.helm + Metrics.tabGap + run(in: geo.size.width) + Metrics.tabGap + Metrics.plusWidth, trailing: 26 + 24)

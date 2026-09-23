@@ -613,6 +613,8 @@ final class Browser: NSObject, ObservableObject {
     var pressure: DispatchSourceMemoryPressure?
     /// Downloads still under way. See `keep(_:)`.
     var downloading: [WKDownload] = []
+    /// The theme-color of the page in front, breathed onto the tab row.
+    @Published var chromeTheme: String?
     /// The Chrome Web Store's pages, told when installs come and go. See StoreRelay.swift.
     var storeWatch: AnyCancellable?
     private var hush: AnyCancellable?
@@ -910,6 +912,7 @@ final class Browser: NSObject, ObservableObject {
         if floating == tab.id { land() }
         leaving()
         activeID = tab.id
+        chromeTheme = tab.theme
         tab.touch()
         // A tab brought back from last time, or waking from ⌘W while pinned,
         // opens the moment you look at it — and only if there was nothing to
@@ -1737,6 +1740,13 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
         // Whatever you last set this site to, before it draws a single frame
         // at the wrong size.
         tab.applyRememberedZoom()
+        // The site's own color for the chrome around it, if it names one.
+        tab.web.evaluateJavaScript("document.querySelector('meta[name=\"theme-color\"]')?.content ?? null") { [weak self] value, _ in
+            guard let self else { return }
+            let theme = value as? String
+            tab.theme = theme
+            if tab.id == self.activeID { self.chromeTheme = theme }
+        }
         // A tab waking from sleep: the new document is in, and a moment
         // after it is on screen the picture of the old one can go.
         tab.uncover(after: 0.45)
