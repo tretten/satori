@@ -1,0 +1,12 @@
+# Build output — build.sh regenerates all of this.
+.build/
+build/
+.swiftpm/
+*.xcuserstate
+.DS_Store
+
+# Signing material that's tied to one Apple Developer account and should
+# never be committed, even though the scripts happily run without it.
+*.provisionprofile
+*.p12
+*.mobileprovision

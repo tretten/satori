@@ -1,0 +1,181 @@
+#!/usr/bin/env python3
+"""Drive the Satori you already have open, from the shell.
+
+    ./bench tabs                       every tab, yours and the bench's
+    ./bench open URL                   a bench tab at the end of the row → its id
+    ./bench go ID URL                  send a bench tab somewhere else
+    ./bench wait ID [SECONDS]          until the page has loaded
+    ./bench sleep ID                   put a tab to sleep now, or say what keeps it awake
+    ./bench select ID                  bring a tab to the front — --test runs only
+    ./bench resize W H [STEPS]         take the window to W×H in steps, like a drag — --test runs only
+    ./bench key ID TEXT                press keys on a tab as real key events — --test runs only
+    ./bench text ID                    the page's text
+    ./bench eval ID JS                 run JavaScript, print what it returns
+    ./bench click ID SELECTOR
+    ./bench type ID SELECTOR TEXT
+    ./bench submit ID SELECTOR         the form around SELECTOR
+    ./bench shot ID [PATH] [WIDTH]     a PNG of the page → its path
+    ./bench close ID | all             only tabs the bench opened
+    ./bench probe                      the window's own state: panels, modal, windows
+    ./bench extensions                 installed extensions, loaded or not, with their warnings
+    ./bench ext-add ID|LINK [--yes]    install from the Chrome Web Store (--yes only in a --test run)
+    ./bench ext-folder PATH [--yes]    install an unpacked extension
+    ./bench ext-press ID               press its button
+    ./bench ext-page ID [PATH]         one of its pages in a bench tab → tab id, for eval
+    ./bench ext-popup ID JS            run JavaScript in its popup while it is open
+    ./bench ext-reload ID              take it up again (a folder one is copied in afresh)
+    ./bench ext-pin ID [on|off]        keep its button in the row beside the puzzle
+    ./bench ext-menu PATH              the puzzle button's list, drawn to a PNG
+    ./bench ext-shot ID PATH           a picture of its popup while it is open
+    ./bench ext-answer yes|no|ask      test run: answer extensions' questions without asking; lists what was asked
+    ./bench ext-enable ID on|off       switch an extension on or off
+    ./bench ext-remove ID
+    ./bench ui KEY VALUE               settings/passwords/welcome/history/downloads/bookmarks/hidden on|off,
+                                       look light|dark|system, sidebar on|off
+
+Needs Settings › General › "Let a script drive Satori" switched on in the
+running app. IDs are the first characters of a tab's id, as `tabs` prints
+them. With --test, talks to a SATORI_PROBE run instead of the real one;
+with --world NAME, to a SATORI_PROBE=NAME run, the world "Satori (NAME)".
+"""
+
+import json
+import os
+import socket
+import sys
+
+def folder(world):
+    name = f"Satori ({world})" if world else "Satori"
+    return os.path.expanduser(f"~/Library/Application Support/{name}")
+
+def ask(path, request):
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+        try:
+            s.connect(path)
+        except (FileNotFoundError, ConnectionRefusedError):
+            sys.exit("Satori isn't listening — is it open, with Settings › General › "
+                     "“Let a script drive Satori” on?")
+        s.sendall((json.dumps(request) + "\n").encode())
+        chunks = []
+        while True:
+            chunk = s.recv(1 << 16)
+            if not chunk:
+                break
+            chunks.append(chunk)
+    line = b"".join(chunks).split(b"\n", 1)[0]
+    return json.loads(line or b"{}")
+
+def main(argv):
+    world = "test" if "--test" in argv else None
+    if "--world" in argv:
+        at = argv.index("--world")
+        if at + 1 >= len(argv): sys.exit("usage: bench --world NAME COMMAND …")
+        world = "".join(c for c in argv[at + 1].lower() if c.isascii() and (c.isalnum() or c == "-"))
+        if world in ("", "1"): world = "test"
+        argv = argv[:at] + argv[at + 2:]
+    yes = "--yes" in argv
+    argv = [a for a in argv if a not in ("--test", "--yes")]
+    if not argv or argv[0] in ("-h", "--help", "help"):
+        print(__doc__.strip())
+        return 0
+    verb, args = argv[0], argv[1:]
+    request = {"do": verb}
+    if verb == "open":
+        if len(args) != 1: sys.exit("usage: bench open URL")
+        request["url"] = args[0]
+    elif verb == "go":
+        if len(args) != 2: sys.exit("usage: bench go ID URL")
+        request["id"], request["url"] = args
+    elif verb in ("wait",):
+        if not args: sys.exit("usage: bench wait ID [SECONDS]")
+        request["id"] = args[0]
+        if len(args) > 1: request["seconds"] = float(args[1])
+    elif verb in ("text", "close", "sleep", "select"):
+        if len(args) != 1: sys.exit(f"usage: bench {verb} ID")
+        request["id"] = args[0]
+    elif verb == "eval":
+        if len(args) != 2: sys.exit("usage: bench eval ID JS")
+        request["id"], request["js"] = args
+    elif verb in ("click", "submit"):
+        if len(args) != 2: sys.exit(f"usage: bench {verb} ID SELECTOR")
+        request["id"], request["selector"] = args
+    elif verb == "type":
+        if len(args) != 3: sys.exit("usage: bench type ID SELECTOR TEXT")
+        request["id"], request["selector"], request["text"] = args
+    elif verb == "shot":
+        if not args: sys.exit("usage: bench shot ID [PATH] [WIDTH]")
+        request["id"] = args[0]
+        if len(args) > 1: request["path"] = os.path.abspath(args[1])
+        if len(args) > 2: request["width"] = float(args[2])
+    elif verb == "ui":
+        if len(args) != 2: sys.exit("usage: bench ui KEY VALUE")
+        key, value = args
+        request[key] = value if key == "look" else value in ("on", "true", "1", "yes")
+    elif verb in ("ext-add", "ext-press", "ext-remove", "ext-reload"):
+        if len(args) != 1: sys.exit(f"usage: bench {verb} ID")
+        request["id"] = args[0]
+        request["yes"] = yes
+    elif verb == "ext-enable":
+        if len(args) != 2: sys.exit("usage: bench ext-enable ID on|off")
+        request["id"] = args[0]
+        request["on"] = args[1] in ("on", "true", "1", "yes")
+    elif verb == "ext-pin":
+        if not 1 <= len(args) <= 2: sys.exit("usage: bench ext-pin ID [on|off]")
+        request["id"] = args[0]
+        request["on"] = (args[1] if len(args) > 1 else "on") in ("on", "true", "1", "yes")
+    elif verb == "ext-answer":
+        if len(args) != 1 or args[0] not in ("yes", "no", "ask"): sys.exit("usage: bench ext-answer yes|no|ask")
+        request["answer"] = args[0]
+    elif verb == "ext-shot":
+        if len(args) != 2: sys.exit("usage: bench ext-shot ID PATH")
+        request["id"] = args[0]
+        request["path"] = os.path.abspath(args[1])
+    elif verb == "ext-menu":
+        if len(args) != 1: sys.exit("usage: bench ext-menu PATH")
+        request["path"] = os.path.abspath(args[0])
+    elif verb == "ext-folder":
+        if len(args) != 1: sys.exit("usage: bench ext-folder PATH")
+        request["path"] = os.path.abspath(args[0])
+        request["yes"] = yes
+    elif verb == "ext-popup":
+        if len(args) != 2: sys.exit("usage: bench ext-popup ID JS")
+        request["id"], request["js"] = args
+    elif verb == "ext-page":
+        if not args: sys.exit("usage: bench ext-page ID [PATH]")
+        request["id"] = args[0]
+        request["path"] = args[1] if len(args) > 1 else ""
+    elif verb == "key":
+        if len(args) != 2: sys.exit("usage: bench key ID TEXT")
+        request["id"], request["text"] = args
+    elif verb == "resize":
+        if len(args) not in (2, 3): sys.exit("usage: bench resize WIDTH HEIGHT [STEPS]")
+        request["width"], request["height"] = float(args[0]), float(args[1])
+        if len(args) == 3: request["steps"] = int(args[2])
+    elif verb not in ("tabs", "probe", "extensions"):
+        sys.exit(f"unknown command “{verb}” — see bench help")
+
+    answer = ask(os.path.join(folder(world), "bench.sock"), request)
+    if "error" in answer:
+        sys.exit("error: " + str(answer["error"]))
+    if verb == "text":
+        print(answer.get("text", ""))
+        if answer.get("truncated"):
+            print("\n[… truncated]", file=sys.stderr)
+    elif verb == "shot":
+        print(answer["path"])
+    elif verb in ("open", "ext-page"):
+        print(answer["id"])
+    elif verb in ("eval", "ext-popup"):
+        value = answer.get("value")
+        print(value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, indent=2))
+    elif verb == "tabs":
+        for tab in answer.get("tabs", []):
+            mark = "⚗" if tab.get("bench") else ("●" if tab.get("active") else " ")
+            state = " …" if tab.get("loading") else (" z" if tab.get("asleep") else "")
+            print(f"{mark} {tab['id']}  {tab.get('title') or '—'}  {tab.get('url')}{state}")
+    else:
+        print(json.dumps(answer, ensure_ascii=False, indent=2))
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
