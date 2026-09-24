@@ -351,13 +351,13 @@ struct SideBar: View {
                 .popover(isPresented: $browser.bookmarksOpen, arrowEdge: .trailing) {
                     BookmarksDropdown(browser: browser, bookmarks: browser.bookmarks)
                 }
-            Door(icon: "command", help: "Settings   ⌘,") { browser.tuning.toggle() }
             if !browser.downloading.isEmpty || !browser.loot.kept.isEmpty {
                 Door(
                     icon: browser.downloading.isEmpty ? "arrow.down.circle" : "arrow.down.circle.fill",
                     help: "Downloads   ⇧⌘J"
                 ) { browser.hoarding.toggle() }
             }
+            Door(icon: "command", help: "Settings   ⌘,") { browser.tuning.toggle() }
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 10)

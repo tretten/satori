@@ -117,7 +117,6 @@ struct TabBar: View {
                             .popover(isPresented: $browser.bookmarksOpen, arrowEdge: .bottom) {
                                 BookmarksDropdown(browser: browser, bookmarks: browser.bookmarks)
                             }
-                        Door(icon: "command", help: "Settings   ⌘,") { browser.tuning.toggle() }
                         // There from the first file on, while the list is
                         // worth opening. Filled while one is still coming.
                         if !browser.downloading.isEmpty || !browser.loot.kept.isEmpty {
@@ -126,6 +125,7 @@ struct TabBar: View {
                                 help: "Downloads   ⇧⌘J"
                             ) { browser.hoarding.toggle() }
                         }
+                        Door(icon: "command", help: "Settings   ⌘,") { browser.tuning.toggle() }
                     }
                     .background {
                         GeometryReader { box in
