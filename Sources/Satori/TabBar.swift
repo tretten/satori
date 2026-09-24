@@ -554,7 +554,7 @@ private struct TabPill: View {
             .animation(Motion.quick, value: tab.loading)
             .animation(Motion.quick, value: tab.noisy)
         }
-        .padding(.leading, 7)
+        .padding(.leading, 9)
         .padding(.trailing, editing ? 11 : 7)
         .padding(.vertical, 7)
         .frame(width: span, alignment: .leading)
