@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 /// Everywhere you have been, and everything you have kept. Two lists in the
@@ -193,27 +194,52 @@ struct HistoryPanel: View {
 struct DownloadsPanel: View {
     @ObservedObject var browser: Browser
     @ObservedObject var loot: Loot
+    /// Ticks the still-coming rows along: a download's progress moves
+    /// outside anything published, so the panel asks again twice a second.
+    @State private var tick = 0
 
     var body: some View {
         Plate("Downloads", width: 560, close: { browser.hoarding = false }) {
-            if loot.kept.isEmpty {
+            if loot.kept.isEmpty && browser.downloading.isEmpty {
                 Card { Nothing("Nothing downloaded yet.") }
             } else {
                 ScrollView(showsIndicators: false) {
                     Card {
-                        ForEach(Array(loot.kept.enumerated()), id: \.element.id) { index, keep in
-                            if index > 0 { Rule() }
-                            Row(
-                                keep: keep,
-                                open: { loot.open(keep) },
-                                reveal: { loot.reveal(keep) },
-                                forget: { loot.forget(keep) }
-                            )
+                        if !browser.downloading.isEmpty {
+                            ForEach(Array(browser.downloading.enumerated()), id: \.offset) { index, download in
+                                if index > 0 { Rule() }
+                                Flight(
+                                    name: download.progress.fileURL?.lastPathComponent
+                                        ?? download.originalRequest?.url?.lastPathComponent
+                                        ?? "download",
+                                    from: download.originalRequest?.url?.host() ?? "",
+                                    fraction: download.progress.fractionCompleted,
+                                    vague: download.progress.isIndeterminate,
+                                    stop: { download.cancel() }
+                                )
+                            }
+                        }
+                        if !browser.downloading.isEmpty && !loot.kept.isEmpty {
+                            Rule()
+                        }
+                        if !loot.kept.isEmpty {
+                            ForEach(Array(loot.kept.enumerated()), id: \.element.id) { index, keep in
+                                if index > 0 || !browser.downloading.isEmpty { Rule() }
+                                Row(
+                                    keep: keep,
+                                    open: { loot.open(keep) },
+                                    reveal: { loot.reveal(keep) },
+                                    forget: { loot.forget(keep) }
+                                )
+                            }
                         }
                     }
                     .padding(.bottom, 2)
                 }
                 .frame(maxHeight: 420)
+                .onReceive(Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()) { _ in
+                    if !browser.downloading.isEmpty { tick += 1 }
+                }
             }
         } foot: {
             HStack {
@@ -226,6 +252,57 @@ struct DownloadsPanel: View {
                     Pill("Clear list") { loot.forgetAll() }
                 }
             }
+        }
+    }
+
+    /// A file still coming: its name, where it is at, and a way to stop it.
+    private struct Flight: View {
+        let name: String
+        let from: String
+        let fraction: Double
+        let vague: Bool
+        let stop: () -> Void
+
+        @State private var hovering = false
+
+        var body: some View {
+            HStack(spacing: 12) {
+                Image(systemName: "arrow.down.circle")
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(Palette.muted)
+                    .frame(width: 18)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(name)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Palette.ink)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    HStack(spacing: 8) {
+                        if vague {
+                            ProgressView()
+                                .scaleEffect(0.7, anchor: .leading)
+                                .frame(width: 80)
+                        } else {
+                            ProgressView(value: fraction)
+                                .frame(width: 80)
+                        }
+                        Text(vague ? from : "\(Int(fraction * 100))% · \(from)")
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(Palette.muted)
+                            .lineLimit(1)
+                    }
+                }
+                Spacer(minLength: 8)
+                if hovering {
+                    Quick("Cancel", tint: .red.opacity(0.75), act: stop)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .background(hovering ? Palette.hover : .clear)
+            .contentShape(Rectangle())
+            .onHover { hovering = $0 }
+            .animation(Motion.quick, value: hovering)
         }
     }
 

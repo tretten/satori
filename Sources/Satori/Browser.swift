@@ -1897,7 +1897,7 @@ extension Browser: WKDownloadDelegate {
             // Cancelled is not a failure: a duplicate download put down in
             // keep(), or a destination never chosen, looks like this.
             guard (error as NSError).code != NSURLErrorCancelled else { return }
-            NSLog("satori download failed: %@", error as NSError)
+            NSLog("satori download failed: %{public}@", error as NSError)
             self.announce("Download failed")
         }
     }
