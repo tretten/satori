@@ -57,7 +57,7 @@ struct SatoriApp: App {
                     set: { _ in browser.toggleSidebar() }
                 ))
                 .keyboardShortcut("s", modifiers: [.command, .shift])
-                Picker("Tabs Wear", selection: Binding(
+                Picker("Tabs show", selection: Binding(
                     get: { browser.prefs.glyph },
                     set: { browser.prefs.glyph = $0 }
                 )) {
