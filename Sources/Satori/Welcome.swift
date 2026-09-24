@@ -126,12 +126,6 @@ struct WelcomePanel: View {
                     withAnimation(Motion.settle) { prefs.sidebar = true }
                 }
             }
-            HStack(spacing: 12) {
-                Text("Tabs wear")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Palette.muted)
-                Segmented(options: Glyph.allCases.map { ($0, $0.title) }, selection: $prefs.glyph)
-            }
         }
     }
 

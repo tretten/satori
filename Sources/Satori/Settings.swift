@@ -209,10 +209,6 @@ struct SettingsPanel: View {
                 ))
             }
             Rule()
-            Line("Tabs show", "Beside the title, and on a pinned square") {
-                Segmented(options: Glyph.allCases.map { ($0, $0.title) }, selection: $prefs.glyph)
-            }
-            Rule()
             Line("Sleep tabs you aren't using", "After half an hour away they come back where you left them. Pinned tabs, sound, calls and anything typed stay awake.") {
                 Switch(on: $prefs.sleepsTabs)
             }
