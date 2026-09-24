@@ -250,6 +250,12 @@ struct ContentView: View {
                 }
 
                 VStack(spacing: 0) {
+                    // The strip's own height while the page starts below it;
+                    // nothing in the sidebar or full screen, where there is no
+                    // strip to leave room for.
+                    Color.clear
+                        .frame(height: browser.prefs.sidebar || browser.active?.immersed == true ? 0 : Metrics.strip)
+
                     // One stage, always.
                     if let tab = browser.active {
                         Page(tab: tab)
@@ -283,7 +289,6 @@ struct ContentView: View {
         .ignoresSafeArea()
         .animation(Motion.settle, value: browser.prefs.sidebar)
         .animation(.easeOut(duration: 0.12), value: browser.active?.immersed)
-        .onChange(of: browser.prefs.sidebar) { _, _ in browser.refreshScrollInsets() }
     }
 
     /// Everything that rises from the bottom edge to say one thing.
