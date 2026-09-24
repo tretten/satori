@@ -1660,6 +1660,17 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
         keep(download)
     }
 
+    /// Take a download down. WebKit answers in the completion handler,
+    /// not in didFail — without taking it out here the row stays forever.
+    func cancel(_ download: WKDownload) {
+        download.cancel { [weak self] _ in
+            guard let self else { return }
+            self.onMain {
+                self.downloading.removeAll { $0 === download }
+            }
+        }
+    }
+
     /// Every download this window has going, heard from until it ends — and
     /// counted, so a tab still sending one to disk is never put to sleep.
     func keep(_ download: WKDownload) {

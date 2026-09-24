@@ -215,7 +215,7 @@ struct DownloadsPanel: View {
                                     from: download.originalRequest?.url?.host() ?? "",
                                     fraction: download.progress.fractionCompleted,
                                     vague: download.progress.isIndeterminate,
-                                    stop: { download.cancel() }
+                                    stop: { browser.cancel(download) }
                                 )
                             }
                         }
