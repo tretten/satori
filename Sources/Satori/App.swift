@@ -160,7 +160,7 @@ struct SatoriApp: App {
                 Button("Downloads…") { browser.hoarding = true }
                     .keyboardShortcut("j", modifiers: [.command, .shift])
                 Divider()
-                Button("Clear History") { browser.clearHistory() }
+                Button("Clear History") { browser.confirmClearHistory() }
             }
             CommandGroup(after: .appSettings) {
                 Button("Settings…") { browser.tuning = true }

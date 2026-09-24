@@ -371,7 +371,7 @@ struct SettingsPanel: View {
             }
             Card {
                 Line("History", "Every address you have been to") {
-                    Pill("Clear") { browser.clearHistory() }
+                    Pill("Clear") { browser.confirmClearHistory() }
                 }
                 Rule()
                 Line("Cookies and sign-ins", "Signs you out of every site") {

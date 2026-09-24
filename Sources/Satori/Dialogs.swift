@@ -208,6 +208,27 @@ extension Browser {
             tab.stale = true
         }
     }
+
+    // MARK: - clearing history from the menu or Settings
+
+    /// Reached from the menu bar or Settings, where there is no panel's
+    /// two-step to guard it: one question first, because the history can't
+    /// be put back.
+    func confirmClearHistory() {
+        let alert = NSAlert()
+        alert.messageText = "Clear all history?"
+        alert.informativeText = "Everywhere you have been is removed and can't be put back."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Clear History")
+        alert.addButton(withTitle: "Cancel")
+        if let window = NSApp.mainWindow {
+            alert.beginSheetModal(for: window) { [weak self] answer in
+                if answer == .alertFirstButtonReturn { self?.clearHistory() }
+            }
+        } else if alert.runModal() == .alertFirstButtonReturn {
+            clearHistory()
+        }
+    }
 }
 
 enum Dialogs {
