@@ -95,7 +95,7 @@ enum Metrics {
     /// Where the first tab starts. The traffic lights run from 12 to 106 —
     /// measured, not guessed — so this leaves them the same air on their right
     /// that the window gives them on their left.
-    static let lights: CGFloat = 127
+    static let lights: CGFloat = 115
     /// Back and forward: two doors and the air before the next
     /// one. In the strip they stand right after the lights; in the sidebar
     /// right of them instead.
