@@ -13,6 +13,7 @@ struct Omnibox: View {
     @State private var shake: CGFloat = 0
     @State private var refused = false
     @State private var breathing = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
@@ -70,6 +71,7 @@ struct Omnibox: View {
             .shadow(color: .black.opacity(0.06), radius: 24, y: 8)
             .modifier(Shake(travel: shake))
             .onAppear {
+                guard !reduceMotion else { return }
                 withAnimation(.easeInOut(duration: 2.6).repeatForever(autoreverses: true)) {
                     breathing = true
                 }

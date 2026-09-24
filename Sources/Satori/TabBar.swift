@@ -741,6 +741,7 @@ struct OneClick: ViewModifier {
 struct Ring: View {
     var size: CGFloat = 10
     @State private var angle: Double = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Circle()
@@ -752,6 +753,7 @@ struct Ring: View {
             .frame(width: size, height: size)
             .rotationEffect(.degrees(angle))
             .onAppear {
+                guard !reduceMotion else { return }
                 withAnimation(.linear(duration: 0.85).repeatForever(autoreverses: false)) {
                     angle = 360
                 }
