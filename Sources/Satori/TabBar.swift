@@ -149,13 +149,12 @@ struct TabBar: View {
             browser.take(providers)
         }
         .background(landing ? Palette.hover : .clear)
-        // Worn in the page's own colour: fully solid while the page is at its
-        // top, a little see-through once it has scrolled.
-        .background((browser.themeColor ?? Palette.ground).opacity(browser.scrolledUnder ? 0.7 : 1))
+        // Worn in the page's own colour, so the strip reads as the page
+        // continuing upward.
+        .background(browser.themeColor ?? Palette.ground)
         .animation(Motion.quick, value: landing)
         .animation(Motion.settle, value: browser.activeID)
         .animation(Motion.quick, value: browser.themeColor)
-        .animation(Motion.quick, value: browser.scrolledUnder)
         // The row makes room for the field on the same spring as everything
         // else. Without this the widths changed between one frame and the next
         // and the tabs appeared to jump aside.

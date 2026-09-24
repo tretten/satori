@@ -255,11 +255,6 @@ final class Tab: ObservableObject, Identifiable {
     /// coming back to a tab that slept starts from what you left, not white.
     @Published private(set) var cover: NSImage?
 
-    /// True once the page has moved off its top. The strip wears it: fully
-    /// solid while the page is at its beginning, a little see-through once it
-    /// has scrolled.
-    @Published private(set) var scrolled = false
-
     /// The page's own colour at its top, read from the element just under the
     /// strip's edge so the strip can wear it and read as the page continuing
     /// upward.
@@ -556,7 +551,6 @@ final class Tab: ObservableObject, Identifiable {
     /// already waits for a frame before it says anything.
     func scrolled(to y: Double, of ceiling: Double, color: Color?) {
         reading = ceiling > 0 ? min(1, max(0, y / ceiling)) : 0
-        scrolled = y > 4
         if color != themeColor { themeColor = color }
         let delta = y - lastY
         lastY = y
@@ -1260,14 +1254,26 @@ final class ScrollRelay: NSObject, WKScriptMessageHandler {
         guard let y = body["y"] as? Double,
               let ceiling = body["max"] as? Double
         else { return }
-        var color: Color?
-        if let rgb = body["tint"] as? [Any], rgb.count >= 3,
-           let r = (rgb[0] as? NSNumber)?.doubleValue,
-           let g = (rgb[1] as? NSNumber)?.doubleValue,
-           let b = (rgb[2] as? NSNumber)?.doubleValue {
-            color = Color(red: r / 255, green: g / 255, blue: b / 255)
+        var rgb: (r: Double, g: Double, b: Double)?
+        if let raw = body["tint"] as? [Any], raw.count >= 3,
+           let r = (raw[0] as? NSNumber)?.doubleValue,
+           let g = (raw[1] as? NSNumber)?.doubleValue,
+           let b = (raw[2] as? NSNumber)?.doubleValue {
+            rgb = (r, g, b)
         }
-        MainActor.assumeIsolated { tab?.scrolled(to: y, of: ceiling, color: color) }
+        MainActor.assumeIsolated {
+            var color: Color?
+            if let rgb {
+                // A tint darker than the ink it would sit behind would hide the
+                // tab names; wear only a tint that agrees with the theme.
+                let lum = 0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b
+                let darkAppearance = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+                if (lum < 128) == darkAppearance {
+                    color = Color(red: rgb.r / 255, green: rgb.g / 255, blue: rgb.b / 255)
+                }
+            }
+            tab?.scrolled(to: y, of: ceiling, color: color)
+        }
     }
 
     /// Reports at most once a frame, and passively, so a page that scrolls
