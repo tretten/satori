@@ -138,13 +138,13 @@ final class Browser: NSObject, ObservableObject {
 
     func openFind() {
         guard active?.isBlank == false else { return }
-        finding = true
+        withAnimation(Motion.settle) { finding = true }
         findFocus += 1
     }
 
     func closeFind() {
         guard finding else { return }
-        finding = false
+        withAnimation(Motion.settle) { finding = false }
         needle = ""
         missed = false
         // There is no public way to call off a find, but letting go of the
