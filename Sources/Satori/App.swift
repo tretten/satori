@@ -689,6 +689,14 @@ struct ContentView: View {
                 browser.closeFind()
                 return true
             }
+            if browser.recalling {
+                browser.recalling = false
+                return true
+            }
+            if browser.hoarding {
+                browser.hoarding = false
+                return true
+            }
             // One step at a time: the list first, then the field.
             if browser.picked != nil {
                 browser.picked = nil
