@@ -101,6 +101,7 @@ struct TabBar: View {
                             )
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("New tab")
                     .onHover { plussed = $0 }
                     .opacity(nearby ? 1 : 0)
                     .scaleEffect(nearby ? 1 : 0.7, anchor: .leading)

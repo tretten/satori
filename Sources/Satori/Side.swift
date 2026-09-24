@@ -637,6 +637,7 @@ struct Door: View {
         .buttonStyle(Pressable())
         .onHover { hovering = $0 }
         .help(help)
+        .accessibilityLabel(help)
         .animation(Motion.quick, value: hovering)
         .animation(Motion.quick, value: on)
     }
