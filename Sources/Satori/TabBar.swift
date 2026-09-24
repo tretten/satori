@@ -341,7 +341,7 @@ private struct TabPill: View {
                 }
                 .frame(width: 16, height: 16)
                 .padding(.horizontal, 7)
-                .padding(.vertical, 6)
+                .padding(.vertical, 7)
                 .frame(width: span)
             } else {
                 loose
@@ -404,7 +404,7 @@ private struct TabPill: View {
                 }
             }
             .frame(width: 16, height: 16)
-            .padding(.vertical, 6)
+            .padding(.vertical, 7)
             .frame(width: span)
         } else {
             titled
@@ -505,7 +505,7 @@ private struct TabPill: View {
                     }
                 } else if hovering || live {
                     Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 8, weight: .medium))
+                        .font(.system(size: 10.5, weight: .medium))
                         .foregroundStyle(Palette.muted)
                         .frame(width: 15, height: 15)
                         .transition(.opacity)
@@ -539,9 +539,9 @@ private struct TabPill: View {
             .animation(Motion.quick, value: tab.loading)
             .animation(Motion.quick, value: tab.noisy)
         }
-        .padding(.leading, 11)
+        .padding(.leading, 7)
         .padding(.trailing, editing ? 11 : 7)
-        .padding(.vertical, 6)
+        .padding(.vertical, 7)
         .frame(width: span, alignment: .leading)
     }
 
