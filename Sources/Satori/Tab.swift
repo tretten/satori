@@ -259,6 +259,15 @@ final class Tab: ObservableObject, Identifiable {
     /// over a page at its beginning, frosted once the page slides under.
     @Published private(set) var scrolled = false
 
+    /// How far the page's content begins below the window's top: the strip's
+    /// height in the row way, nothing in the sidebar or full screen.
+    private var topInset: CGFloat = Metrics.strip
+
+    func setScrollInset(_ top: CGFloat) {
+        topInset = top
+        built?.contentTopInset = top
+    }
+
     private var watch: [NSKeyValueObservation] = []
 
     /// A tab that has never been anywhere shows the address field instead of a
@@ -319,6 +328,7 @@ final class Tab: ObservableObject, Identifiable {
         controller.add(forms, name: FormRelay.name)
         Shield.shared.protect(controller)
         built = web
+        web.contentTopInset = topInset
         arm(hiding: veils)
 
         watch = [
@@ -934,6 +944,18 @@ final class AudioWatch: NSObject {
     deinit { stop() }
 }
 
+private extension NSView {
+    /// WKWebView keeps its scroll view private on macOS — there is no public
+    /// way to ask for it — so it is found by walking down instead.
+    var descendantScrollView: NSScrollView? {
+        if let scroll = self as? NSScrollView { return scroll }
+        for sub in subviews {
+            if let found = sub.descendantScrollView { return found }
+        }
+        return nil
+    }
+}
+
 /// A web view that reads the two-finger swipe for itself.
 final class PageView: WKWebView {
     /// What extensions added to the right-click menu, at the end of it.
@@ -953,6 +975,28 @@ final class PageView: WKWebView {
     /// Told the moment the page is reached for — a click, a scroll — so the
     /// picture of a tab waking up never stands between you and the page.
     var onTouch: (() -> Void)?
+
+    /// The page's content starts this far below the window's top: the strip's
+    /// height in the row way, nothing in the sidebar or full screen. WKWebView
+    /// keeps its scroll view private, so the inset is pushed onto it the
+    /// moment it can be found, on every layout.
+    var contentTopInset: CGFloat = Metrics.strip {
+        didSet { pushInset() }
+    }
+
+    override func layout() {
+        super.layout()
+        pushInset()
+    }
+
+    private var foundScroll: NSScrollView?
+
+    private func pushInset() {
+        if foundScroll == nil || foundScroll?.superview == nil {
+            foundScroll = descendantScrollView
+        }
+        foundScroll?.contentInsets = NSEdgeInsets(top: contentTopInset, left: 0, bottom: 0, right: 0)
+    }
 
     override func mouseDown(with event: NSEvent) {
         onTouch?()

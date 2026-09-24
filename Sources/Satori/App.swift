@@ -250,13 +250,6 @@ struct ContentView: View {
                 }
 
                 VStack(spacing: 0) {
-                    // The strip's own height while the page starts below it;
-                    // nothing once the page has scrolled and slides under the
-                    // frosted strip instead — nor where there is no strip.
-                    Color.clear
-                        .frame(height: browser.prefs.sidebar || browser.active?.immersed == true || browser.scrolledUnder ? 0 : Metrics.strip)
-                        .animation(Motion.settle, value: browser.scrolledUnder)
-
                     // One stage, always.
                     if let tab = browser.active {
                         Page(tab: tab)
@@ -290,6 +283,7 @@ struct ContentView: View {
         .ignoresSafeArea()
         .animation(Motion.settle, value: browser.prefs.sidebar)
         .animation(.easeOut(duration: 0.12), value: browser.active?.immersed)
+        .onChange(of: browser.prefs.sidebar) { _, _ in browser.refreshScrollInsets() }
     }
 
     /// Everything that rises from the bottom edge to say one thing.

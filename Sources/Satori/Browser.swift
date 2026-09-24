@@ -16,7 +16,12 @@ final class Browser: NSObject, ObservableObject {
             // subscribing sends the tab's current state straight away.
             if let id = activeID, let tab = tabs.first(where: { $0.id == id }) {
                 scrollWatch = tab.$scrolled.sink { [weak self] in self?.scrolledUnder = $0 }
+                immerseWatch = tab.$immersed.sink { [weak self] _ in self?.refreshScrollInsets() }
             }
+            // The active page's content sits below the strip — or at the very
+            // top in the sidebar or full screen — and each way is pushed on
+            // every switch, including the first tab.
+            refreshScrollInsets()
             // The tab just left is the tab just looked at. Whether a tab has
             // gone unwatched long enough to sleep is counted from here, not
             // from when it was first picked.
@@ -26,9 +31,10 @@ final class Browser: NSObject, ObservableObject {
     }
 
     /// True while the page in front has scrolled from its top. Read by the
-    /// strip and the room above the page; written only from the active tab.
+    /// strip; written only from the active tab.
     @Published private(set) var scrolledUnder = false
     private var scrollWatch: AnyCancellable?
+    private var immerseWatch: AnyCancellable?
 
     /// The tab whose page is currently out in the little window. Nothing
     /// floating means no window: the two are checked against each other rather
@@ -88,6 +94,14 @@ final class Browser: NSObject, ObservableObject {
     /// ⇧⌘S. The same tabs, down the left or across the top.
     func toggleSidebar() {
         withAnimation(Motion.settle) { prefs.sidebar.toggle() }
+    }
+
+    /// The page's content starts below the strip in the row way, and at the
+    /// very top in the sidebar or full screen. Pushed onto every tab's web
+    /// view whenever the way or the screen changes.
+    func refreshScrollInsets() {
+        let top = (prefs.sidebar || active?.immersed == true) ? 0 : Metrics.strip
+        for tab in tabs { tab.setScrollInset(top) }
     }
 
     /// The address field, raised over a page by ⌘L. A blank tab shows it
