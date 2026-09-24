@@ -611,8 +611,8 @@ final class Browser: NSObject, ObservableObject {
     /// macOS saying memory is short. See Sleep.swift.
     var dozing: Timer?
     var pressure: DispatchSourceMemoryPressure?
-    /// Downloads still under way. See `keep(_:)`.
-    var downloading: [WKDownload] = []
+    /// Downloads still under way. Published: the downloads door hangs on it.
+    @Published private(set) var downloading: [WKDownload] = []
     /// The Chrome Web Store's pages, told when installs come and go. See StoreRelay.swift.
     var storeWatch: AnyCancellable?
     private var hush: AnyCancellable?
@@ -641,6 +641,11 @@ final class Browser: NSObject, ObservableObject {
             .sink { [weak self] in self?.objectWillChange.send() }
             .store(in: &bag)
 
+        // The downloads door stays while the list is worth opening, so
+        // the loot's changes come through here too.
+        loot.objectWillChange
+            .sink { [weak self] in self?.objectWillChange.send() }
+            .store(in: &bag)
         // An icon that arrives is put on every tab showing that site, not only
         // the one that happened to ask for it.
         Favicons.shared.arrived = { [weak self] host, image in
