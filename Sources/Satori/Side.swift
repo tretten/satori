@@ -465,9 +465,29 @@ private struct SideRow: View {
                     },
                     finish: { browser.cancelTabEdit() })
                     .frame(height: 16)
-            } else {
-                if prefs.glyph == .icons, !tab.isBlank {
-                    Mark(icon: tab.icon, letter: tab.monogram, size: 15)
+            } else if hovering || (prefs.glyph == .icons && !tab.isBlank) {
+                // The close lives where the mark was: the face swaps for
+                // a cross under the hand, and the tap swaps with it.
+                ZStack {
+                    if hovering {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundStyle(Palette.muted)
+                            .frame(width: 15, height: 15)
+                            .background(Palette.ink.opacity(0.07), in: Circle())
+                            .transition(.opacity)
+                    } else if prefs.glyph == .icons, !tab.isBlank {
+                        Mark(icon: tab.icon, letter: tab.monogram, size: 15)
+                    }
+                }
+                .frame(width: 15, height: 15)
+                .overlay {
+                    if hovering {
+                        Color.clear
+                            .frame(width: 24, height: 28)
+                            .contentShape(Rectangle())
+                            .onTapGesture { close() }
+                    }
                 }
                 if tab.bench {
                     // A script's tab, not yours.
@@ -489,16 +509,28 @@ private struct SideRow: View {
 
             Spacer(minLength: 2)
 
+            // Reload at the row's far end: the ring while the page is still
+            // coming (a tap stops it), the arrow otherwise — always on the
+            // tab you are on, under the hand on the rest.
             ZStack {
-                if hovering, !editing {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 8, weight: .semibold))
+                if tab.loading {
+                    if hovering {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundStyle(Palette.muted)
+                            .frame(width: 15, height: 15)
+                            .transition(.opacity)
+                            .help("Stop   ⌘.")
+                    } else {
+                        Ring().transition(.opacity)
+                    }
+                } else if hovering || live {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 10.5, weight: .medium))
                         .foregroundStyle(Palette.muted)
                         .frame(width: 15, height: 15)
-                        .background(Palette.ink.opacity(0.07), in: Circle())
                         .transition(.opacity)
-                } else if tab.loading {
-                    Ring().transition(.opacity)
+                        .help("Reload   ⌘R")
                 } else if tab.noisy {
                     Image(systemName: "speaker.wave.2.fill")
                         .font(.system(size: 8))
@@ -513,7 +545,10 @@ private struct SideRow: View {
                     Color.clear
                         .frame(width: 30, height: 28)
                         .contentShape(Rectangle())
-                        .onTapGesture { if hovering { close() } }
+                        .onTapGesture {
+                            if tab.loading { tab.stop() }
+                            else if hovering || live { tab.reload() }
+                        }
                 }
             }
             .animation(Motion.quick, value: hovering)
