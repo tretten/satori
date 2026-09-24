@@ -65,13 +65,20 @@ if [ "$CONFIG" = "release" ]; then
   strip -x "$APP/Contents/MacOS/$NAME"
 fi
 
-# The icon, drawn fresh each time — it is thirty lines of Swift, not an asset
-# to keep in step with anything.
-ICONSET="build/AppIcon.iconset"
-rm -rf "$ICONSET"
-swift Icon/icon.swift "$ICONSET" > /dev/null
-iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
-rm -rf "$ICONSET"
+# The icon — a Liquid Glass .icon package, compiled by actool into the asset
+# catalog (macOS 26) with a raster .icns fallback for older systems.
+rm -rf build/IconResources build/AppIcon.icon build/icon-partial.plist
+mkdir -p build/IconResources
+cp -R Icon/icon.icon build/AppIcon.icon
+xcrun actool build/AppIcon.icon \
+  --compile build/IconResources \
+  --platform macosx \
+  --minimum-deployment-target "$MINIMUM" \
+  --app-icon AppIcon \
+  --standalone-icon-behavior all \
+  --output-partial-info-plist build/icon-partial.plist
+cp build/IconResources/Assets.car "$APP/Contents/Resources/Assets.car"
+cp build/IconResources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -86,6 +93,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleVersion</key><string>$BUILD</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
+  <key>CFBundleIconName</key><string>AppIcon</string>
   <key>LSMinimumSystemVersion</key><string>$MINIMUM</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
   <key>NSHumanReadableCopyright</key><string>© tretten · Satori</string>
