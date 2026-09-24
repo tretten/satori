@@ -7,7 +7,7 @@ import Foundation
 // what can't be a place gets searched.
 
 enum Engine: String, CaseIterable, Identifiable {
-    case google, duckduckgo, brave, bing, kagi
+    case google, duckduckgo, brave, bing, kagi, ecosia, startpage, yahoo
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -16,6 +16,9 @@ enum Engine: String, CaseIterable, Identifiable {
         case .brave: return "Brave Search"
         case .bing: return "Bing"
         case .kagi: return "Kagi"
+        case .ecosia: return "Ecosia"
+        case .startpage: return "Startpage"
+        case .yahoo: return "Yahoo"
         }
     }
 
@@ -50,6 +53,9 @@ enum Engine: String, CaseIterable, Identifiable {
         case .brave: return "https://search.brave.com/search?q="
         case .bing: return "https://www.bing.com/search?q="
         case .kagi: return "https://kagi.com/search?q="
+        case .ecosia: return "https://www.ecosia.org/search?q="
+        case .startpage: return "https://www.startpage.com/sp/search?query="
+        case .yahoo: return "https://search.yahoo.com/search?p="
         }
     }
 }
