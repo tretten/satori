@@ -259,10 +259,10 @@ struct TabBar: View {
     }
 }
 
-/// Back, forward. They watch the live tab, not the window: whether
+/// Reload, back, forward. They watch the live tab, not the window: whether
 /// there is anywhere to go back to is the tab's to say, and it changes with
-/// every page. Reload lives in the tab itself now. Used here and, beside
-/// the traffic lights instead of at the far end of the row, in the sidebar.
+/// every page. Used here and, beside the traffic lights instead of at the
+/// far end of the row, in the sidebar.
 struct Helm: View {
     @ObservedObject var browser: Browser
 
@@ -289,6 +289,15 @@ struct Helm: View {
             let back = !tab.isBlank && tab.canGoBack
             let forward = !tab.isBlank && tab.canGoForward
             HStack(spacing: 2) {
+                // Reload, back where it used to be — before back and forward —
+                // and a stop while the page is still on its way.
+                if tab.loading {
+                    Door(icon: "xmark", help: "Stop   ⌘.") { tab.stop() }
+                } else {
+                    Door(icon: "arrow.clockwise", help: "Reload   ⌘R") { tab.reload() }
+                        .disabled(tab.isBlank)
+                        .opacity(tab.isBlank ? 0.3 : 1)
+                }
                 Door(icon: "chevron.left", help: "Back   ⌘[") { browser.back() }
                     .disabled(!back)
                     .opacity(back ? 1 : 0.3)
@@ -298,6 +307,7 @@ struct Helm: View {
             }
             .animation(Motion.quick, value: back)
             .animation(Motion.quick, value: forward)
+            .animation(Motion.quick, value: tab.loading)
         }
     }
 }
@@ -510,56 +520,13 @@ private struct TabPill: View {
 
             Spacer(minLength: 2)
 
-            // Pinned to the right-hand end of the pill, not trailing the title.
-            // One slot doing two jobs: the arrow once the page is in, the
-            // ring while it is still coming (a tap stops it), never both.
-            ZStack {
-                if tab.loading {
-                    if hovering {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 8, weight: .semibold))
-                            .foregroundStyle(Palette.muted)
-                            .frame(width: 15, height: 15)
-                            .transition(.opacity)
-                            .help("Stop   ⌘.")
-                    } else {
-                        Ring().transition(.opacity)
-                    }
-                } else if hovering || live {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 10.5, weight: .medium))
-                        .foregroundStyle(Palette.muted)
-                        .frame(width: 15, height: 15)
-                        .transition(.opacity)
-                        .help("Reload   ⌘R")
-                } else if tab.noisy {
-                    // Which tab the noise is coming from. ⌘⇧M stops it.
-                    Image(systemName: "speaker.wave.2.fill")
-                        .font(.system(size: 8))
-                        .foregroundStyle(Palette.muted)
-                        .transition(.opacity)
-                }
+            // Which tab the noise is coming from. ⌘⇧M stops it.
+            if tab.noisy {
+                Image(systemName: "speaker.wave.2.fill")
+                    .font(.system(size: 8))
+                    .foregroundStyle(Palette.muted)
+                    .frame(width: 15, height: 15)
             }
-            .frame(width: editing ? 0 : 15, height: 15)
-            .opacity(editing ? 0 : 1)
-            // The glyph is 15 points across because that is how big it should
-            // look. What you have to hit is the whole right-hand end of the
-            // tab: an overlay is not laid out, so it can reach past its own
-            // frame without moving anything that is.
-            .overlay {
-                if !editing {
-                    Color.clear
-                        .frame(width: 30, height: 28)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            if tab.loading { tab.stop() }
-                            else if hovering || live { tab.reload() }
-                        }
-                }
-            }
-            .animation(Motion.quick, value: hovering)
-            .animation(Motion.quick, value: tab.loading)
-            .animation(Motion.quick, value: tab.noisy)
         }
         .padding(.leading, 9)
         .padding(.trailing, editing ? 11 : 7)
