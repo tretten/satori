@@ -11,6 +11,12 @@ final class Browser: NSObject, ObservableObject {
     @Published private(set) var tabs: [Tab] = []
     @Published var activeID: Tab.ID? {
         didSet {
+            // The strip wears the page in front: solid over its top, frosted
+            // once it scrolls. Follows every switch, including the first tab —
+            // subscribing sends the tab's current state straight away.
+            if let id = activeID, let tab = tabs.first(where: { $0.id == id }) {
+                scrollWatch = tab.$scrolled.sink { [weak self] in self?.scrolledUnder = $0 }
+            }
             // The tab just left is the tab just looked at. Whether a tab has
             // gone unwatched long enough to sleep is counted from here, not
             // from when it was first picked.
@@ -18,6 +24,11 @@ final class Browser: NSObject, ObservableObject {
             tabs.first { $0.id == old }?.touch()
         }
     }
+
+    /// True while the page in front has scrolled from its top. Read by the
+    /// strip and the room above the page; written only from the active tab.
+    @Published private(set) var scrolledUnder = false
+    private var scrollWatch: AnyCancellable?
 
     /// The tab whose page is currently out in the little window. Nothing
     /// floating means no window: the two are checked against each other rather

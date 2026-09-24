@@ -255,6 +255,10 @@ final class Tab: ObservableObject, Identifiable {
     /// coming back to a tab that slept starts from what you left, not white.
     @Published private(set) var cover: NSImage?
 
+    /// True once the page has moved from its top. The strip wears it: solid
+    /// over a page at its beginning, frosted once the page slides under.
+    @Published private(set) var scrolled = false
+
     private var watch: [NSKeyValueObservation] = []
 
     /// A tab that has never been anywhere shows the address field instead of a
@@ -546,6 +550,8 @@ final class Tab: ObservableObject, Identifiable {
     /// already waits for a frame before it says anything.
     func scrolled(to y: Double, of ceiling: Double) {
         reading = ceiling > 0 ? min(1, max(0, y / ceiling)) : 0
+        // The strip wears the page: frosted once it has moved off its top.
+        scrolled = y > 12
         let delta = y - lastY
         lastY = y
         onScroll?(self, y, delta)

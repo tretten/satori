@@ -12,8 +12,8 @@ import AppKit
 // out again whenever it sees fit (a resize, full screen, the window becoming
 // key), so every time it does, the buttons are put back.
 //
-// Update: the buttons are hidden outright — no states, no ovals, no
-// redrawing. The row is positioned the same; only the dots are gone.
+// The buttons are left as AppKit draws them — standard, shown, their own
+// states and ovals — and only the row's position is put back each time.
 
 @MainActor
 final class Lights: NSObject {
@@ -93,11 +93,9 @@ final class Lights: NSObject {
             frame.origin.y = window.frame.height - height
             container.frame = frame
         }
-        // Only the row moves; the spacing is AppKit's doing. The buttons
-        // themselves stay hidden — AppKit unhides them on its own layouts,
-        // so every pass hides them again.
+        // Only the row moves; the spacing and the buttons' own states are
+        // AppKit's doing, left standard.
         for (index, button) in buttons.enumerated() {
-            button.isHidden = true
             let size = button.frame.size
             let origin = NSPoint(
                 x: Lights.centre.x - size.width / 2 + CGFloat(index) * spacing,

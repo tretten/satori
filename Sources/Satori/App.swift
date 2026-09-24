@@ -250,11 +250,12 @@ struct ContentView: View {
                 }
 
                 VStack(spacing: 0) {
-                    // Room for the traffic lights, and for the strip when there
-                    // is one. The page starts under it, not behind it — a page
-                    // sliding beneath floating chrome is a browser showing off,
-                    // and it costs a compositing pass.
-                    Color.clear.frame(height: band)
+                    // The strip's own height while the page starts below it;
+                    // nothing once the page has scrolled and slides under the
+                    // frosted strip instead — nor where there is no strip.
+                    Color.clear
+                        .frame(height: browser.prefs.sidebar || browser.active?.immersed == true || browser.scrolledUnder ? 0 : Metrics.strip)
+                        .animation(Motion.settle, value: browser.scrolledUnder)
 
                     // One stage, always.
                     if let tab = browser.active {
@@ -562,16 +563,9 @@ struct ContentView: View {
         browser.active?.immersed == true ? 0 : Metrics.pageInset
     }
 
-    /// The column has its own corner for the lights, so the page beside it
-    /// starts at the very top; the strip needs a band.
-    private var band: CGFloat {
-        guard browser.active?.immersed != true else { return 0 }
-        return browser.prefs.sidebar ? 0 : Metrics.strip
-    }
-
-    /// Put the resting circles in the title bar, exactly over the buttons.
-    /// With the buttons hidden outright there is nothing to cover: the layer
-    /// stays put away.
+    /// Put the resting circles in the title bar, exactly over the buttons,
+    /// for when the app is behind: macOS's own resting buttons come out
+    /// nearly white on a light window, so these cover them until it's back.
     private func measureLights() {
         guard let window,
               let close = window.standardWindowButton(.closeButton),

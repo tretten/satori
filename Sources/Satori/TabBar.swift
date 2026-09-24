@@ -152,7 +152,12 @@ struct TabBar: View {
             browser.take(providers)
         }
         .background(landing ? Palette.hover : .clear)
+        // Solid over the page's own top; melting to frosted glass the
+        // moment the page scrolls under it.
+        .background(Palette.ground.opacity(browser.scrolledUnder ? 0 : 1))
+        .background(.bar)
         .animation(Motion.quick, value: landing)
+        .animation(Motion.quick, value: browser.scrolledUnder)
         .animation(Motion.settle, value: browser.activeID)
         // The row makes room for the field on the same spring as everything
         // else. Without this the widths changed between one frame and the next

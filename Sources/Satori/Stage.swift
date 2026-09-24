@@ -313,9 +313,9 @@ struct DragStrip: NSViewRepresentable {
 ///
 /// macOS does draw its own in that state, but in a light window they come out
 /// nearly white on white — Apple's own choice, and the reason a pale window
-/// looks like it has lost its controls while a dark one does not. So the
-/// system's are put away and these are drawn in exactly their place, read from
-/// the real buttons rather than guessed at.
+/// looks like it has lost its controls while a dark one does not. So these
+/// are drawn over them in exactly their place, read from the real buttons
+/// rather than guessed at.
 ///
 /// It lives inside the title bar rather than in the window's content, because
 /// the title bar draws above everything the app puts on screen.
