@@ -1664,6 +1664,15 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
     /// counted, so a tab still sending one to disk is never put to sleep.
     func keep(_ download: WKDownload) {
         download.delegate = self
+        // The same file already on its way: a second download would fight
+        // it over the destination, and WebKit fails what it can't overwrite.
+        // One click, one file — the one already coming keeps coming.
+        if let url = download.originalRequest?.url,
+           downloading.contains(where: { $0.originalRequest?.url == url })
+        {
+            download.cancel()
+            return
+        }
         downloading.append(download)
         // The tab behind it stays an empty view with the file's address:
         // marked, so coming back or reloading never starts the file over.
@@ -1885,6 +1894,10 @@ extension Browser: WKDownloadDelegate {
     ) {
         onMain {
             self.downloading.removeAll { $0 === download }
+            // Cancelled is not a failure: a duplicate download put down in
+            // keep(), or a destination never chosen, looks like this.
+            guard (error as NSError).code != NSURLErrorCancelled else { return }
+            NSLog("satori download failed: %@", error as NSError)
             self.announce("Download failed")
         }
     }
