@@ -88,6 +88,10 @@ final class Tab: ObservableObject, Identifiable {
     /// Set when the page never arrived — no host, no network, a refused
     /// connection. Shown in place of the page rather than in a dialog.
     @Published var failure: String?
+    /// Set when this tab's navigation turned into a download instead of a
+    /// page: the view stays empty behind the file's address, and loading it
+    /// again would start the file over. Cleared by the next real commit.
+    var downloaded = false
     /// The error behind it, for the small print under the message.
     @Published var failureCode: String?
     /// How far down the page you are, nought to one. The tab's own pill fills
@@ -761,7 +765,7 @@ final class Tab: ObservableObject, Identifiable {
             recoverFromCrash()
             return
         }
-        guard !isBlank, pending == nil, !loading, failure == nil else { return }
+        guard !isBlank, pending == nil, !loading, failure == nil, !downloaded else { return }
         // A view with no document behind an address: whatever emptied it, the
         // address is what to show, and reload alone would have nothing to do.
         if hollow, let address {
@@ -833,7 +837,7 @@ final class Tab: ObservableObject, Identifiable {
         // A pin put down with ⌘W has no view left to reload; waking it is
         // the reload.
         guard !wake() else { return }
-        if hollow, let address {
+        if hollow, !downloaded, let address {
             web.load(URLRequest(url: address))
         } else {
             web.reloadFromOrigin()

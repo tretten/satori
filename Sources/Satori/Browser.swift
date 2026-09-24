@@ -1665,6 +1665,9 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
     func keep(_ download: WKDownload) {
         download.delegate = self
         downloading.append(download)
+        // The tab behind it stays an empty view with the file's address:
+        // marked, so coming back or reloading never starts the file over.
+        tabs.first(where: { $0.built === download.webView })?.downloaded = true
     }
 
     /// Without this WebKit refuses every request out of hand, and a page that
@@ -1739,6 +1742,9 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
         tab.failure = nil
         tab.failureCode = nil
         tab.typing = false
+        // A real page is in: whatever file this tab downloaded before is
+        // history, and coming back may load again.
+        tab.downloaded = false
         // Whatever you last set this site to, before it draws a single frame
         // at the wrong size.
         tab.applyRememberedZoom()
