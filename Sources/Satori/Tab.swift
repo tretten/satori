@@ -255,6 +255,11 @@ final class Tab: ObservableObject, Identifiable {
     /// coming back to a tab that slept starts from what you left, not white.
     @Published private(set) var cover: NSImage?
 
+    /// The page's own colour at its top, read from the element just under the
+    /// strip's edge so the strip can wear it and read as the page continuing
+    /// upward.
+    @Published private(set) var themeColor: Color?
+
     private var watch: [NSKeyValueObservation] = []
 
     /// A tab that has never been anywhere shows the address field instead of a
@@ -544,8 +549,9 @@ final class Tab: ObservableObject, Identifiable {
 
     /// Called from the page, a few dozen times a second at most — the script
     /// already waits for a frame before it says anything.
-    func scrolled(to y: Double, of ceiling: Double) {
+    func scrolled(to y: Double, of ceiling: Double, color: Color?) {
         reading = ceiling > 0 ? min(1, max(0, y / ceiling)) : 0
+        if color != themeColor { themeColor = color }
         let delta = y - lastY
         lastY = y
         onScroll?(self, y, delta)
@@ -1248,7 +1254,14 @@ final class ScrollRelay: NSObject, WKScriptMessageHandler {
         guard let y = body["y"] as? Double,
               let ceiling = body["max"] as? Double
         else { return }
-        MainActor.assumeIsolated { tab?.scrolled(to: y, of: ceiling) }
+        var color: Color?
+        if let rgb = body["tint"] as? [Any], rgb.count >= 3,
+           let r = (rgb[0] as? NSNumber)?.doubleValue,
+           let g = (rgb[1] as? NSNumber)?.doubleValue,
+           let b = (rgb[2] as? NSNumber)?.doubleValue {
+            color = Color(red: r / 255, green: g / 255, blue: b / 255)
+        }
+        MainActor.assumeIsolated { tab?.scrolled(to: y, of: ceiling, color: color) }
     }
 
     /// Reports at most once a frame, and passively, so a page that scrolls
@@ -1256,11 +1269,27 @@ final class ScrollRelay: NSObject, WKScriptMessageHandler {
     static let script = """
     (function () {
       var waiting = false;
+      // The colour of the element just under the strip's edge, so the strip
+      // can wear it and read as the page continuing upward. Walks up past
+      // anything that paints nothing to the first solid colour it meets.
+      function tint() {
+        var el = document.elementFromPoint(window.innerWidth / 2, 1);
+        while (el && el !== document.documentElement) {
+          var c = getComputedStyle(el).backgroundColor;
+          if (c.indexOf('rgba') === 0) {
+            if (parseFloat(c.slice(c.lastIndexOf(',') + 1)) === 0) { el = el.parentElement; continue; }
+          }
+          var m = c.match(/[0-9]+/g);
+          if (m && m.length >= 3) return [ +m[0], +m[1], +m[2] ];
+          el = el.parentElement;
+        }
+        return null;
+      }
       function tell() {
         var root = document.documentElement;
         var y = window.scrollY || root.scrollTop || 0;
         var ceiling = Math.max(1, (root.scrollHeight || 0) - window.innerHeight);
-        window.webkit.messageHandlers.\(name).postMessage({ y: y, max: ceiling });
+        window.webkit.messageHandlers.\(name).postMessage({ y: y, max: ceiling, tint: tint() });
       }
       window.addEventListener('scroll', function () {
         if (waiting) return;

@@ -11,6 +11,12 @@ final class Browser: NSObject, ObservableObject {
     @Published private(set) var tabs: [Tab] = []
     @Published var activeID: Tab.ID? {
         didSet {
+            // The strip wears the page's own colour. Follows every switch,
+            // including the first tab — subscribing sends the tab's current
+            // state straight away.
+            if let id = activeID, let tab = tabs.first(where: { $0.id == id }) {
+                tintWatch = tab.$themeColor.sink { [weak self] in self?.themeColor = $0 }
+            }
             // The tab just left is the tab just looked at. Whether a tab has
             // gone unwatched long enough to sleep is counted from here, not
             // from when it was first picked.
@@ -18,6 +24,11 @@ final class Browser: NSObject, ObservableObject {
             tabs.first { $0.id == old }?.touch()
         }
     }
+
+    /// The page's own colour at its top, worn by the strip so it reads as the
+    /// page continuing upward.
+    @Published private(set) var themeColor: Color?
+    private var tintWatch: AnyCancellable?
 
     /// The tab whose page is currently out in the little window. Nothing
     /// floating means no window: the two are checked against each other rather
