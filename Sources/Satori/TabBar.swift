@@ -19,6 +19,16 @@ struct TabBar: View {
     /// How wide the doors at the far end are, extension buttons included.
     @State private var doors: CGFloat = 0
 
+    /// The strip's own ground: solid while the page is at its top, frosted
+    /// once it scrolls under, and wearing whatever colour sits just under it
+    /// so a stuck header reads as continuing into the bar.
+    private var stripGround: Color {
+        if browser.scrolledUnder, let tint = browser.underTint {
+            return tint
+        }
+        return Palette.ground.opacity(browser.scrolledUnder ? 0 : 1)
+    }
+
     var body: some View {
         // A GeometryReader is only here to measure the width. Its content is
         // put in a stack of its own and told to fill it: left to itself a
@@ -150,8 +160,9 @@ struct TabBar: View {
         }
         .background(landing ? Palette.hover : .clear)
         // Solid over the page's own top; melting to frosted glass the
-        // moment the page scrolls under it.
-        .background(Palette.ground.opacity(browser.scrolledUnder ? 0 : 1))
+        // moment the page scrolls under it, and wearing whatever colour sits
+        // just under it so a stuck header reads as continuing into the bar.
+        .background(stripGround)
         .background(.bar)
         .animation(Motion.quick, value: landing)
         .animation(Motion.quick, value: browser.scrolledUnder)

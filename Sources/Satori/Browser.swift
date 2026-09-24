@@ -17,6 +17,7 @@ final class Browser: NSObject, ObservableObject {
             if let id = activeID, let tab = tabs.first(where: { $0.id == id }) {
                 scrollWatch = tab.$scrolled.sink { [weak self] in self?.scrolledUnder = $0 }
                 immerseWatch = tab.$immersed.sink { [weak self] _ in self?.refreshScrollInsets() }
+                tintWatch = tab.$underTint.sink { [weak self] in self?.underTint = $0 }
             }
             // The active page's content sits below the strip — or at the very
             // top in the sidebar or full screen — and each way is pushed on
@@ -35,6 +36,12 @@ final class Browser: NSObject, ObservableObject {
     @Published private(set) var scrolledUnder = false
     private var scrollWatch: AnyCancellable?
     private var immerseWatch: AnyCancellable?
+
+    /// The colour the strip wears once the page has scrolled under it — the
+    /// colour of whatever sits just under it, so a stuck header continues
+    /// into the bar.
+    @Published private(set) var underTint: Color?
+    private var tintWatch: AnyCancellable?
 
     /// The tab whose page is currently out in the little window. Nothing
     /// floating means no window: the two are checked against each other rather

@@ -259,6 +259,10 @@ final class Tab: ObservableObject, Identifiable {
     /// over a page at its beginning, frosted once the page slides under.
     @Published private(set) var scrolled = false
 
+    /// The colour of whatever sits just under the strip, so a stuck header
+    /// can be drawn continuing into the bar rather than sliding under it.
+    @Published private(set) var underTint: Color?
+
     /// How far the page's content begins below the window's top: the strip's
     /// height in the row way, nothing in the sidebar or full screen.
     private var topInset: CGFloat = Metrics.strip
@@ -558,10 +562,14 @@ final class Tab: ObservableObject, Identifiable {
 
     /// Called from the page, a few dozen times a second at most — the script
     /// already waits for a frame before it says anything.
-    func scrolled(to y: Double, of ceiling: Double) {
+    func scrolled(to y: Double, of ceiling: Double, tint: Color?) {
         reading = ceiling > 0 ? min(1, max(0, y / ceiling)) : 0
-        // The strip wears the page: frosted once it has moved off its top.
+        // The strip wears the page: frosted once it has moved off its top,
+        // and tinted with whatever sits just under it so a stuck header reads
+        // as continuing into the bar rather than sliding under it.
         scrolled = y > 12
+        let newTint = y > 12 ? tint : nil
+        if newTint != underTint { underTint = newTint }
         let delta = y - lastY
         lastY = y
         onScroll?(self, y, delta)
@@ -1298,7 +1306,14 @@ final class ScrollRelay: NSObject, WKScriptMessageHandler {
         guard let y = body["y"] as? Double,
               let ceiling = body["max"] as? Double
         else { return }
-        MainActor.assumeIsolated { tab?.scrolled(to: y, of: ceiling) }
+        var tint: Color?
+        if let rgb = body["tint"] as? [Any], rgb.count >= 3,
+           let r = (rgb[0] as? NSNumber)?.doubleValue,
+           let g = (rgb[1] as? NSNumber)?.doubleValue,
+           let b = (rgb[2] as? NSNumber)?.doubleValue {
+            tint = Color(red: r / 255, green: g / 255, blue: b / 255)
+        }
+        MainActor.assumeIsolated { tab?.scrolled(to: y, of: ceiling, tint: tint) }
     }
 
     /// Reports at most once a frame, and passively, so a page that scrolls
@@ -1306,11 +1321,27 @@ final class ScrollRelay: NSObject, WKScriptMessageHandler {
     static let script = """
     (function () {
       var waiting = false;
+      // The colour of whatever sits just under the strip, so a stuck header
+      // can be drawn continuing into the bar. Walks up past anything that
+      // paints nothing, and reports the first solid colour it meets.
+      function tint() {
+        var el = document.elementFromPoint(window.innerWidth / 2, 1);
+        while (el && el !== document.documentElement) {
+          var c = getComputedStyle(el).backgroundColor;
+          if (c.indexOf('rgba') === 0) {
+            if (parseFloat(c.slice(c.lastIndexOf(',') + 1)) === 0) { el = el.parentElement; continue; }
+          }
+          var m = c.match(/[0-9]+/g);
+          if (m && m.length >= 3) return [ +m[0], +m[1], +m[2] ];
+          el = el.parentElement;
+        }
+        return null;
+      }
       function tell() {
         var root = document.documentElement;
         var y = window.scrollY || root.scrollTop || 0;
         var ceiling = Math.max(1, (root.scrollHeight || 0) - window.innerHeight);
-        window.webkit.messageHandlers.\(name).postMessage({ y: y, max: ceiling });
+        window.webkit.messageHandlers.\(name).postMessage({ y: y, max: ceiling, tint: tint() });
       }
       window.addEventListener('scroll', function () {
         if (waiting) return;
