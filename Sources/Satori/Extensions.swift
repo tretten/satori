@@ -110,9 +110,8 @@ final class Extensions: NSObject, ObservableObject {
         // workers the user agent of the last page that loaded and, when it
         // differs, stops the running workers to apply it — and extension
         // workers it then never starts again: every page that opened killed
-        // the extensions. Extensions are told they run in Chrome by the shim
-        // instead (navigator.userAgent in their pages and workers).
-        views.applicationNameForUserAgent = Web.userAgentName
+        // the extensions.
+        views.applicationNameForUserAgent = Web.userAgentSuffix
         // A test run sits behind other windows, where WebKit slows its views
         // to a crawl and messages between an extension's popup and its
         // worker stop arriving. Not what anyone is testing.

@@ -15,9 +15,13 @@ enum Web {
     /// Modern WebKit pools processes by data store on its own — every tab
     /// asking for the same one is what gets the second tab a warm process, and
     /// the old WKProcessPool knob does nothing now.
-    /// What every view says it is after "AppleWebKit … (KHTML, like Gecko)"
-    /// — web tabs and extension views alike (see Extensions.init).
-    static let userAgentName = "Version/26.5 Safari/605.1.15"
+    /// What every view says it is after WebKit's own
+    /// "AppleWebKit … (KHTML, like Gecko)" — web tabs and extension views
+    /// alike (see Extensions.init). A Chrome tail, not Safari's: string-based
+    /// bot checks and captchas see a browser they know. The engine stays
+    /// WebKit, which no string can change — anything doing real feature
+    /// detection still sees WebKit.
+    static let userAgentSuffix = "Chrome/\(Crx.chromeVersion) Safari/537.36"
 
     static func configuration(shy: Bool = false) -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
@@ -32,10 +36,11 @@ enum Web {
         // Left alone, WKWebView says only "AppleWebKit … (KHTML, like Gecko)" —
         // no browser, no version. Google reads that as something it doesn't
         // recognise and serves the stripped-back page from a decade ago:
-        // no side panel, no dark mode, none of the modern tabs. Naming a
-        // version turns it into the same string Safari sends, and the modern
-        // page comes back.
-        config.applicationNameForUserAgent = Web.userAgentName
+        // no side panel, no dark mode, none of the modern tabs. A Chrome
+        // tail turns it into a browser the web knows; the configuration can
+        // only append, and the same tail everywhere keeps extension workers
+        // alive (see Extensions.init).
+        config.applicationNameForUserAgent = Web.userAgentSuffix
         config.allowsAirPlayForMediaPlayback = true
         // Off by default on macOS, which is why a full-screen button on a video
         // did nothing at all: the page asks, and WebKit refuses without a word.
