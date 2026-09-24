@@ -53,8 +53,6 @@ final class Browser: NSObject, ObservableObject {
     let bookmarks = Bookmarks()
     /// The full list, for taking things out.
     @Published var bookmarking = false
-    /// The dropdown off the button.
-    @Published var bookmarksOpen = false
 
     /// ⇧⌘B. The page you are on, at the end of the list.
     func bookmarkCurrent() {

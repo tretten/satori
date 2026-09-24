@@ -347,10 +347,6 @@ struct SideBar: View {
     private var foot: some View {
         HStack(spacing: 2) {
             ExtensionSlot(edge: .trailing)
-            Door(icon: "star", help: "Bookmarks") { browser.bookmarksOpen.toggle() }
-                .popover(isPresented: $browser.bookmarksOpen, arrowEdge: .trailing) {
-                    BookmarksDropdown(browser: browser, bookmarks: browser.bookmarks)
-                }
             if !browser.downloading.isEmpty || !browser.loot.kept.isEmpty {
                 Door(
                     icon: browser.downloading.isEmpty ? "arrow.down.circle" : "arrow.down.circle.fill",

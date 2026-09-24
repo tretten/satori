@@ -114,10 +114,6 @@ struct TabBar: View {
                     // far end of the row. The dropdown hangs from the star.
                     HStack(spacing: Metrics.tabGap) {
                         ExtensionSlot()
-                        Door(icon: "star", help: "Bookmarks") { browser.bookmarksOpen.toggle() }
-                            .popover(isPresented: $browser.bookmarksOpen, arrowEdge: .bottom) {
-                                BookmarksDropdown(browser: browser, bookmarks: browser.bookmarks)
-                            }
                         // There from the first file on, while the list is
                         // worth opening. Filled while one is still coming.
                         if !browser.downloading.isEmpty || !browser.loot.kept.isEmpty {
