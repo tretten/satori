@@ -109,14 +109,15 @@ struct TabBar: View {
 
                     Spacer(minLength: 0)
 
-                    // The extensions and the bookmarks, at the far end
-                    // of the row. The dropdown hangs from the last one.
+                    // The extensions, the bookmarks and the settings, at the
+                    // far end of the row. The dropdown hangs from the star.
                     HStack(spacing: Metrics.tabGap) {
                         ExtensionSlot()
                         Door(icon: "star", help: "Bookmarks") { browser.bookmarksOpen.toggle() }
                             .popover(isPresented: $browser.bookmarksOpen, arrowEdge: .bottom) {
                                 BookmarksDropdown(browser: browser, bookmarks: browser.bookmarks)
                             }
+                        Door(icon: "command", help: "Settings   ⌘,") { browser.tuning.toggle() }
                     }
                     .background {
                         GeometryReader { box in

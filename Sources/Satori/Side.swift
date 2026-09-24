@@ -343,7 +343,7 @@ struct SideBar: View {
         .padding(.top, SideBar.gap)
     }
 
-    /// One small door at the bottom: the settings.
+    /// Small doors at the bottom: the bookmarks, the settings.
     private var foot: some View {
         HStack(spacing: 2) {
             ExtensionSlot(edge: .trailing)
@@ -351,6 +351,7 @@ struct SideBar: View {
                 .popover(isPresented: $browser.bookmarksOpen, arrowEdge: .trailing) {
                     BookmarksDropdown(browser: browser, bookmarks: browser.bookmarks)
                 }
+            Door(icon: "command", help: "Settings   ⌘,") { browser.tuning.toggle() }
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 10)
