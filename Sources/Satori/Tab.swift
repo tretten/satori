@@ -255,6 +255,11 @@ final class Tab: ObservableObject, Identifiable {
     /// coming back to a tab that slept starts from what you left, not white.
     @Published private(set) var cover: NSImage?
 
+    /// True once the page has moved off its top. The strip wears it: fully
+    /// solid while the page is at its beginning, a little see-through once it
+    /// has scrolled.
+    @Published private(set) var scrolled = false
+
     /// The page's own colour at its top, read from the element just under the
     /// strip's edge so the strip can wear it and read as the page continuing
     /// upward.
@@ -551,6 +556,7 @@ final class Tab: ObservableObject, Identifiable {
     /// already waits for a frame before it says anything.
     func scrolled(to y: Double, of ceiling: Double, color: Color?) {
         reading = ceiling > 0 ? min(1, max(0, y / ceiling)) : 0
+        scrolled = y > 4
         if color != themeColor { themeColor = color }
         let delta = y - lastY
         lastY = y

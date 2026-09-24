@@ -16,6 +16,7 @@ final class Browser: NSObject, ObservableObject {
             // state straight away.
             if let id = activeID, let tab = tabs.first(where: { $0.id == id }) {
                 tintWatch = tab.$themeColor.sink { [weak self] in self?.themeColor = $0 }
+                scrollWatch = tab.$scrolled.sink { [weak self] in self?.scrolledUnder = $0 }
             }
             // The tab just left is the tab just looked at. Whether a tab has
             // gone unwatched long enough to sleep is counted from here, not
@@ -24,6 +25,10 @@ final class Browser: NSObject, ObservableObject {
             tabs.first { $0.id == old }?.touch()
         }
     }
+
+    /// True once the page in front has scrolled off its top.
+    @Published private(set) var scrolledUnder = false
+    private var scrollWatch: AnyCancellable?
 
     /// The page's own colour at its top, worn by the strip so it reads as the
     /// page continuing upward.
