@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tretten/satori/releases/latest/download/Satori.dmg">Download Satori for macOS</a>
+  <a href="https://github.com/tretten/satori/releases/latest/download/Satori.dmg"><strong>⬇ Download Satori for macOS</strong></a>
 </p>
 
 ## Features
