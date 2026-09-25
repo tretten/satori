@@ -291,7 +291,7 @@ struct ContentView: View {
                 VStack(spacing: 0) {
                     // Safari-Compact overlay: the page extends behind the 48pt
                     // strip (`stripReserve` is 0) and WebKit obscured insets
-                    // (`topSafeInset`, 48) shift normal flow AND fixed/sticky
+                    // (`Tab.desiredTopInset`, 48) shift normal flow AND fixed/sticky
                     // site headers below the bar while scrolled content slides
                     // beneath the translucent material. The TabBar stays above
                     // the page in the ZStack so hit-testing, DragStrip,
@@ -301,7 +301,7 @@ struct ContentView: View {
 
                     // One stage, always.
                     if let tab = browser.active {
-                        Page(tab: tab, topInset: topSafeInset)
+                        Page(tab: tab)
                             .overlay(alignment: .topTrailing) {
                                 if browser.finding {
                                     FindBar(browser: browser)
@@ -615,7 +615,7 @@ struct ContentView: View {
     /// Always 0: Safari-Compact overlay in every state — the page extends
     /// behind the 48pt strip whether the bar is tinted opaque or untinted
     /// translucent. Content offset comes from WebKit obscured insets
-    /// (`topSafeInset`), which shift normal flow AND fixed/sticky headers
+    /// (`Tab.desiredTopInset`), which shift normal flow AND fixed/sticky headers
     /// below the bar while scrolled content slides beneath it. Keeping the
     /// reserve constant (instead of 48 tinted / 0 untinted) means tint flips
     /// change only the bar's material, never the viewport geometry — no
@@ -638,25 +638,10 @@ struct ContentView: View {
         WebApp.on && browser.active?.immersed != true ? Metrics.bar : 0
     }
 
-    /// Safari-Compact obscured top inset for the page (see StageView).
-    ///
-    /// 48pt whenever the top strip is visible (tinted opaque or untinted
-    /// translucent alike): normal content starts below the bar, scrolled
-    /// content slides beneath it, and viewport-anchored fixed/sticky site
-    /// headers (e.g. Amazon's) stop at the bar's bottom edge instead of
-    /// hiding under it. Applied via WKWebView `_setTopContentInset:`
-    /// (obscuredContentInsets, `responds(to:)`-gated); the legacy
-    /// NSScrollView `contentInsets.top` path stays retired at 0 to avoid a
-    /// double offset. Sidebar (no strip) and immersed fullscreen (no strip)
-    /// take 0; blank/sleeping/floating take 48 like any strip state so
-    /// loading or waking never shifts layout (the floating *window* itself
-    /// clears to 0 on lift — see Float.lift — and restores on landing).
-    /// No CSS is injected, so scroll, zoom, find and reader mode keep their
-    /// semantics.
-    private var topSafeInset: CGFloat {
-        if WebApp.on || browser.prefs.sidebar || browser.active?.immersed == true { return 0 }
-        return Metrics.strip
-    }
+    /// The obscured top inset lives in `Tab.desiredTopInset` (single source
+    /// of truth, resolved live by the stage). No snapshot is computed here:
+    /// a value captured at render time used to race `Tab.applyTopInsetNow`
+    /// and overwrite the correct 48 with a stale 0 on a later layout.
 
     /// Put the resting circles in the title bar, exactly over the buttons,
     /// for when the app is behind: macOS's own resting buttons come out

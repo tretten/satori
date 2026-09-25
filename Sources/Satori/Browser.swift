@@ -1245,6 +1245,7 @@ final class Browser: NSObject, ObservableObject {
     /// Stepping away from a tab. A video you were watching does not stop
     /// existing because you went to look something up.
     private func leaving() {
+        guard prefs.floatsVideo else { return }
         lift(active, quietly: true)
     }
 

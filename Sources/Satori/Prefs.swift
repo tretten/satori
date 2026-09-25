@@ -58,6 +58,11 @@ final class Preferences: ObservableObject {
     @Published var sleepsTabs: Bool {
         didSet { store.set(sleepsTabs, forKey: "tabs.sleep") }
     }
+    /// A video playing in a tab you step away from goes on in the little
+    /// window. On unless turned off; ⌘⇧P still lifts one by hand.
+    @Published var floatsVideo: Bool {
+        didSet { store.set(floatsVideo, forKey: "float.auto") }
+    }
     /// The ad blocker. On unless turned off; there is nothing else to it.
     @Published var shielded: Bool {
         didSet { store.set(shielded, forKey: "shield") }
@@ -131,6 +136,7 @@ final class Preferences: ObservableObject {
         sideWidth = min(Metrics.sideMax, max(Metrics.sideMin, CGFloat(width)))
         glyph = store.string(forKey: "glyph").flatMap(Glyph.init) ?? .icons
         sleepsTabs = store.object(forKey: "tabs.sleep") as? Bool ?? true
+        floatsVideo = store.object(forKey: "float.auto") as? Bool ?? true
         shielded = store.object(forKey: "shield") as? Bool ?? true
         // A test run downloads into its own folder: ~/Downloads would have
         // macOS stop it to ask for access, with a dialog on the screen of

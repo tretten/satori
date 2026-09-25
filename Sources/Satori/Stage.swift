@@ -13,19 +13,16 @@ import WebKit
 struct Page: View {
     @ObservedObject var tab: Tab
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// Obscured top inset for the page (Safari-Compact bar height): 48 under
-    /// the overlay strip, 0 with the sidebar / immersed / floating. Applied as
-    /// WKWebView obscured insets (shifts normal flow AND fixed/sticky headers;
-    /// scrolled content slides beneath the bar). Kept as a parameter so the
-    /// stage can restore the right value on return (e.g. from the floating
-    /// window, which clears it to 0).
-    var topInset: CGFloat = 0
-
+    /// Single source of truth for the obscured top inset is
+    /// `Tab.desiredTopInset` (live, floating/sidebar/immersed-aware), resolved
+    /// by the stage at call time. No snapshot is passed down: a `topInset`
+    /// value captured during a transition (e.g. 0 while detached) used to race
+    /// the imperative path and overwrite the correct 48 on a later layout.
     var body: some View {
         ZStack {
             // A tab put down with ⌘W has no view, and asking for one here
             // would build an empty one a frame before the stage moves on.
-            WebStage(page: tab.isBlank || tab.asleep ? nil : tab.web, topInset: topInset, isFloating: tab.floating)
+            WebStage(page: tab.isBlank || tab.asleep ? nil : tab.web, tab: tab)
 
             if let cover = tab.cover {
                 // The page as it was left, while it is rebuilt underneath —
@@ -141,13 +138,13 @@ private struct Disc: View {
 /// reload, no lost scroll position, no forgotten form.
 struct WebStage: NSViewRepresentable {
     let page: NSView?
-    var topInset: CGFloat = 0
-    var isFloating: Bool = false
+    let tab: Tab?
 
     func makeNSView(context: Context) -> StageView { StageView() }
 
     func updateNSView(_ view: StageView, context: Context) {
-        view.show(page, topInset: topInset, isFloating: isFloating)
+        // Resolved live from the owning tab at call time — never a snapshot.
+        view.show(page, owningTab: tab)
     }
 }
 
@@ -174,6 +171,8 @@ struct WebStage: NSViewRepresentable {
     optional func setTopContentInset(_ inset: CGFloat)
     @objc(_setTopContentInset:immediate:)
     optional func setTopContentInset(_ inset: CGFloat, immediate: Bool)
+    @objc(_setAutomaticallyAdjustsContentInsets:)
+    optional func setAutomaticallyAdjustsContentInsets(_ on: Bool)
 }
 
 extension WKWebView: WKTopContentInset {}
@@ -191,23 +190,20 @@ final class StageView: NSView {
     /// Now there is one fact and one rule: show `wanted`, and put that right on
     /// every layout. Nothing to fall out of step with.
     private weak var wanted: NSView?
-    /// The obscured top inset to hold on `wanted` (Safari-Compact bar height).
-    /// Stored so `layout()` re-applies it without new parameters.
-    private var wantedInset: CGFloat = 0
-    /// Whether `wanted` belongs to a tab whose page is out in the floating
-    /// video window. Stored alongside `wantedInset` so `layout()` re-applies
-    /// the floating zero inset without new parameters.
-    private var wantedFloating: Bool = false
+    /// The owning tab — the single source of truth for the inset. `layout()`
+    /// re-resolves `owner?.desiredTopInset` live on every pass; no snapshot is
+    /// stored, so a value captured during a transition can never overwrite the
+    /// correct one later.
+    private weak var owner: Tab?
 
     override func layout() {
         super.layout()
         settle()
     }
 
-    func show(_ page: NSView?, topInset: CGFloat = 0, isFloating: Bool = false) {
+    func show(_ page: NSView?, owningTab: Tab?) {
         wanted = page
-        wantedInset = topInset
-        wantedFloating = isFloating
+        owner = owningTab
         settle()
     }
 
@@ -227,16 +223,20 @@ final class StageView: NSView {
         // No CSS is injected; scroll position, zoom, find and reader mode are
         // untouched — only WebKit-native obscured insets change.
         //
-        // Gated on both the owning tab's floating flag and the window level:
-        // the flag covers the detached moment where `window` is nil between
-        // `removeFromSuperview` and the panel's `orderFrontRegardless` (where
-        // a level check alone reads nil as "not floating" and re-applies 48),
-        // while the level covers any path that reaches here without the flag.
+        // Single source of truth: `owner?.desiredTopInset`, resolved live here
+        // (floating/sidebar/immersed-aware). Gated on both the owning tab's
+        // floating flag and the window level: the flag covers the detached
+        // moment where `window` is nil between `removeFromSuperview` and the
+        // panel's `orderFrontRegardless` (where a level check alone reads nil
+        // as "not floating" and re-applies 48), while the level covers any
+        // path that reaches here without the flag.
+        let wantInset = owner?.desiredTopInset ?? 0
+        let isFloating = (owner?.floating ?? false)
         if let wanted {
-            if wantedFloating || wanted.window?.level == .floating {
+            if isFloating || wanted.window?.level == .floating {
                 StageView.applyTopInset(0, to: wanted)
             } else {
-                StageView.applyTopInset(wantedInset, to: wanted)
+                StageView.applyTopInset(wantInset, to: wanted)
             }
         }
 
@@ -244,21 +244,13 @@ final class StageView: NSView {
         // The floating video window owns the page while it shows it. Taking
         // it back here is how a float would be stolen mid-play, so the stage
         // stays empty until the page lands home on its own.
-        if wantedFloating || wanted.window?.level == .floating { return }
+        if isFloating || wanted.window?.level == .floating { return }
         if wanted.superview !== self {
             // A web view can have only one superview, so taking it back is how
             // it is taken back.
             wanted.removeFromSuperview()
             wanted.alphaValue = 1
             addSubview(wanted)
-            // Back from another tab, a page could come in drawn right up
-            // under the strip, its inset gone. WebKit ignores being told the
-            // value it believes it already has, so it is walked off and back
-            // on to be sent again.
-            if wantedInset != 0 {
-                StageView.applyTopInset(0, to: wanted)
-                StageView.applyTopInset(wantedInset, to: wanted)
-            }
             // A web view coming back into a window sometimes keeps the last
             // picture it had — which, after a while out of one, is nothing.
             // Asking it to draw again is cheap and is what brings it back.
@@ -295,6 +287,12 @@ final class StageView: NSView {
     /// apply without a frame of lag; otherwise the plain setter (present since
     /// ~10.13, covering the macOS 14 deployment floor) is used. Both are
     /// `responds(to:)`-gated; without either, the page keeps overlay + 0 inset.
+    /// Sent unconditionally on every pass, on purpose: WebKit can drop the
+    /// obscured inset out of band (a layout in the SwiftUI hosting
+    /// environment, a window resize), and only a re-send heals it. Telling
+    /// WebKit the value it already holds is cheap — it ignores the repeat —
+    /// so no last-sent cache is kept that could fall out of step with what
+    /// the page actually carries.
     static func applyTopInset(_ top: CGFloat, to page: NSView) {
         if let scroll = scrollInside(page) {
             if scroll.automaticallyAdjustsContentInsets {
@@ -312,6 +310,11 @@ final class StageView: NSView {
             }
         }
         guard let web = page as? WKWebView else { return }
+        // WKWebView adjusts its own top inset by default, recomputing it from
+        // the window whenever the page moves into one — and with a
+        // transparent titlebar it lands on 0, wiping ours. That is the page
+        // under the strip after coming back from a blank tab.
+        (web as WKTopContentInset).setAutomaticallyAdjustsContentInsets?(false)
         let immediateSel = Selector(("_setTopContentInset:immediate:"))
         let plainSel = Selector(("_setTopContentInset:"))
         if web.responds(to: immediateSel) {

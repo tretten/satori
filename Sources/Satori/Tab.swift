@@ -397,8 +397,9 @@ final class Tab: ObservableObject, Identifiable {
         Shield.shared.protect(controller)
         built = web
         // Eager strip inset at creation, before any load or first paint:
-        // the SwiftUI update path (`Page.topInset` → `updateNSView` → `show`
-        // → `settle`) can arrive after WebKit has already started rendering.
+        // the SwiftUI update path (`updateNSView` → `show` → `settle`,
+        // resolving `desiredTopInset` live) can arrive after WebKit has
+        // already started rendering.
         applyTopInsetNow()
         arm(hiding: veils)
 
@@ -957,7 +958,7 @@ final class Tab: ObservableObject, Identifiable {
 
     /// The obscured top inset this tab's page should carry right now.
     ///
-    /// Mirrors the stage's `topSafeInset` rule (see App.swift): 48 under the
+    /// Single source of truth for the stage (see StageView): 48 under the
     /// overlay strip, 0 with the sidebar or immersed fullscreen. Tinted and
     /// untinted alike take 48 — only the bar's material changes, never the
     /// viewport geometry. Blank and sleeping tabs take 48 like any strip

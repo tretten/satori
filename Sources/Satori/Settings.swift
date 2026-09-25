@@ -239,6 +239,10 @@ struct SettingsPanel: View {
             Line("Sleep tabs you do not use", "After half an hour away they return where you left them. Pinned tabs, sound, calls and anything typed stay awake.") {
                 Switch(on: $prefs.sleepsTabs)
             }
+            Rule()
+            Line("Float video when you leave its tab", "A playing video goes on in a small window above everything. ⌘⇧P floats one by hand.") {
+                Switch(on: $prefs.floatsVideo)
+            }
         }
     }
 
