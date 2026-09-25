@@ -14,7 +14,7 @@ struct HiddenPanel: View {
                 Card { Nothing("Nothing is hidden here.") }
             } else {
                 VStack(alignment: .leading, spacing: 6) {
-                    Caption("Hidden on this site — rest on a line to see it")
+                    Caption("Hidden on this site. Rest on a line to see it.")
                     ScrollView(showsIndicators: false) {
                         Card {
                             ForEach(Array(browser.hereVeils.enumerated()), id: \.element.id) { index, veil in

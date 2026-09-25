@@ -1,18 +1,25 @@
 #!/bin/bash
 # Puts the three files the site serves into the site: the disk image for
-# people, the ZIP for the updater, and the appcast that names them both.
+# people, the ZIP the updater fetches, and the Sparkle appcast that names the
+# release. (The versioned Satori-<version>.dmg/.zip and the appcast go to the
+# GitHub release as well — the appcast as the `appcast.xml` asset the app
+# reads at .../releases/latest/download/appcast.xml.)
 #
 #   ./publish.sh /path/to/download/folder
 #
 # ./build.sh release ship makes them first (release dmg makes them too, but
 # unnotarised — fine for trying, not for anyone else's Mac). The names never
 # change, so the site's links never have to.
+#
+# This is the site-hosting copy only. The GitHub release the updater reads
+# is published separately: script/release.sh --publish (which also verifies
+# the download sizes and the live feed — see docs/SIGNING.md).
 set -euo pipefail
 
 cd "$(dirname "$0")"
 [ $# -eq 1 ] || { echo "usage: ./publish.sh <folder>" >&2; exit 1; }
 FOLDER="$1"
-FILES=(Satori.dmg Satori.zip appcast.json)
+FILES=(Satori.dmg Satori.zip appcast.xml)
 
 for FILE in "${FILES[@]}"; do
   [ -f "build/$FILE" ] || { echo "build/$FILE is missing — ./build.sh release dmg makes it" >&2; exit 1; }

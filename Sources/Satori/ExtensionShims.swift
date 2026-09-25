@@ -2228,7 +2228,8 @@ enum ExtensionShims {
             let threshold = (first as? Double) ?? 60
             if let session = CGSessionCopyCurrentDictionary() as? [String: Any],
                session["CGSSessionScreenIsLocked"] as? Bool == true { return "locked" }
-            let quiet = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)
+            let anyEvent: CGEventType = unsafeBitCast(UInt32.max, to: CGEventType.self)
+            let quiet = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: anyEvent)
             return quiet >= threshold ? "idle" : "active"
         case "idle.getAutoLockDelay":
             return 0

@@ -36,6 +36,7 @@ struct SideBar: View {
     var body: some View {
         ZStack(alignment: .top) {
             DragStrip(reserved: 0, below: rowsEnd)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             // The band the lights sit in is this mode's title bar: the window
             // is dragged by it and a double-click fills the screen with it,
@@ -43,11 +44,12 @@ struct SideBar: View {
             // clicks. The lights are the title bar's own and answer first.
             HStack(spacing: 0) {
                 DragStrip()
-                    .frame(width: 10 + Metrics.sideLights)
+                    .frame(width: 10 + Metrics.sideLights, height: Metrics.strip)
                 Color.clear
                     .frame(width: Metrics.helm)
                     .allowsHitTesting(false)
                 DragStrip()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .frame(height: Metrics.strip)
 
@@ -91,9 +93,12 @@ struct SideBar: View {
             browser.take(providers)
         }
         .animation(Motion.quick, value: landing)
-        .animation(Motion.settle, value: browser.activeID)
-        .animation(Motion.settle, value: browser.editingTab)
-        .animation(Motion.settle, value: browser.tabs.map(\.id))
+        // Same as the top strip: the transaction that activates a
+        // just-inserted tab must not slide the live pill, or the ghost
+        // doubles the new row while it transitions in.
+        .animation(browser.insertedID == nil ? Motion.settle : nil, value: browser.activeID)
+        // No animation on tab-list identity: same freeze as the top strip —
+        // every insertion animated all rows at once. Reorder animates explicitly.
         .animation(Motion.settle, value: browser.pinnedCount)
     }
 
@@ -199,7 +204,7 @@ struct SideBar: View {
                 .offset(pinOffset(held: held, index: index, columns: cols))
                 .zIndex(held ? 1 : 0)
                 .shadow(color: .black.opacity(held ? 0.16 : 0), radius: 10, y: 3)
-                .gesture(pinReorder(tab: tab, index: index, columns: cols, width: width, height: height))
+                .highPriorityGesture(pinReorder(tab: tab, index: index, columns: cols, width: width, height: height))
             }
         } }
         .coordinateSpace(name: "pins")
@@ -284,7 +289,7 @@ struct SideBar: View {
                 .offset(y: held ? travel - CGFloat(index - from) * step : 0)
                 .zIndex(held ? 1 : 0)
                 .shadow(color: .black.opacity(held ? 0.14 : 0), radius: 12, y: 4)
-                .gesture(reorder(tab: tab, index: index, step: step))
+                .highPriorityGesture(reorder(tab: tab, index: index, step: step))
             }
         }
         .coordinateSpace(name: "rows")
@@ -347,6 +352,8 @@ struct SideBar: View {
     private var foot: some View {
         HStack(spacing: 2) {
             ExtensionSlot(edge: .trailing)
+                // Same as the top strip: icons stay out of the insertion transaction.
+                .transaction { $0.animation = nil }
             if !browser.downloading.isEmpty || !browser.loot.kept.isEmpty {
                 Door(
                     icon: browser.downloading.isEmpty ? "arrow.down.circle" : "arrow.down.circle.fill",
@@ -375,6 +382,10 @@ private struct PinSquare: View {
     var height: CGFloat = 34
 
     @State private var hovering = false
+    /// See the tab pills: one tap only, so picking never waits out the
+    /// system's double-click delay; a second tap soon after counts as the
+    /// double-click that edits the pin's letter.
+    @State private var lastTap = Date.distantPast
 
     /// Everything drawn inside scales off the shorter edge — the one that
     /// stays put — so the glyph sits at its usual size, centred, rather than
@@ -412,21 +423,40 @@ private struct PinSquare: View {
         .frame(width: width, height: height)
         .background {
             if live {
-                RoundedRectangle(cornerRadius: scale * 9 / 34, style: .continuous)
-                    .fill(Palette.wash)
-                    .matchedGeometryEffect(id: "live", in: pill)
+                if browser.insertedID == tab.id {
+                    // Just inserted: arrive with the cell, don't slide.
+                    RoundedRectangle(cornerRadius: scale * 9 / 34, style: .continuous)
+                        .fill(Palette.wash)
+                } else {
+                    RoundedRectangle(cornerRadius: scale * 9 / 34, style: .continuous)
+                        .fill(Palette.wash)
+                        .matchedGeometryEffect(id: "live", in: pill)
+                }
             } else {
                 RoundedRectangle(cornerRadius: scale * 9 / 34, style: .continuous)
                     .fill(hovering ? Palette.hover : Palette.wash.opacity(0.55))
             }
         }
         .contentShape(RoundedRectangle(cornerRadius: scale * 9 / 34, style: .continuous))
-        .modifier(OneClick(double: live) {
-            if live { browser.editLetter(tab) } else { browser.select(tab) }
-        })
+        .onTapGesture {
+            let now = Date()
+            let double = now.timeIntervalSince(lastTap) < 0.4
+            lastTap = now
+            if double {
+                if tab.id != browser.activeID { browser.select(tab) }
+                browser.editLetter(tab)
+                return
+            }
+            if live {
+                tab.scrollToTop()
+            } else {
+                browser.select(tab)
+            }
+        }
         .onHover { hovering = $0 }
         .contextMenu { TabMenu(browser: browser, tab: tab, close: { browser.close(tab) }) }
         .help(tab.label)
+        .accessibilityHint(live ? "Scrolls to the top. Double-click changes the letter." : "Shows this tab. Double-click changes its letter.")
         .animation(Motion.quick, value: hovering)
         .transition(.scale(scale: 0.8).combined(with: .opacity))
     }
@@ -442,33 +472,14 @@ private struct SideRow: View {
     let close: () -> Void
 
     @State private var hovering = false
-    @State private var shake: CGFloat = 0
-
-    private var editing: Bool { browser.editingTab == tab.id }
+    /// See the tab pills: one tap only, so picking never waits out the
+    /// system's double-click delay; a second tap soon after counts as the
+    /// double-click that raises the centred address field.
+    @State private var lastTap = Date.distantPast
 
     var body: some View {
         HStack(spacing: 8) {
-            if editing {
-                PillField(browser: browser,
-                    text: { browser.tabDraft },
-                    change: { browser.tabDraft = $0 },
-                    command: {
-                        switch $0 {
-                        case #selector(NSResponder.insertNewline(_:)):
-                            // Returning true keeps the field editing, which is what lets a
-                            // refused address stay on screen instead of being thrown away.
-                            browser.commitTabEdit()
-                            return true
-                        case #selector(NSResponder.cancelOperation(_:)):
-                            browser.cancelTabEdit()
-                            return true
-                        default:
-                            return false
-                        }
-                    },
-                    finish: { browser.cancelTabEdit() })
-                    .frame(height: 16)
-            } else if hovering || (prefs.glyph == .icons && !tab.isBlank) {
+            if hovering || (prefs.glyph == .icons && !tab.isBlank) {
                 // The close lives where the mark was: the face swaps for
                 // a cross under the hand, and the tap swaps with it.
                 ZStack {
@@ -541,59 +552,81 @@ private struct SideRow: View {
                         .transition(.opacity)
                 }
             }
-            .frame(width: editing ? 0 : 15, height: 15)
-            .opacity(editing ? 0 : 1)
+            .frame(width: 15, height: 15)
             .overlay {
-                if !editing {
-                    Color.clear
-                        .frame(width: 30, height: 28)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            if tab.loading { tab.stop() }
-                            else if hovering || live { tab.reload() }
-                        }
-                }
+                Color.clear
+                    .frame(width: 30, height: 28)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if tab.loading { tab.stop() }
+                        else if hovering || live { tab.reload() }
+                    }
             }
             .animation(Motion.quick, value: hovering)
             .animation(Motion.quick, value: tab.loading)
             .animation(Motion.quick, value: tab.noisy)
         }
         .padding(.leading, 10)
-        .padding(.trailing, editing ? 10 : 7)
+        .padding(.trailing, 7)
         .frame(height: 28)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background { ground }
-        .modifier(Shake(travel: shake))
         .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-        .modifier(OneClick(double: false) {
-            if live { browser.beginTabEdit(tab) } else { browser.select(tab) }
-        })
+        // One tap gesture only, so picking a row never waits out the system's
+        // double-click delay (see `lastTap`). A single click on the row already
+        // showing scrolls its page to the top; a double-click raises the
+        // centred address field, picking the row first when left alone.
+        .onTapGesture {
+            let now = Date()
+            let double = now.timeIntervalSince(lastTap) < 0.4
+            lastTap = now
+            if double {
+                if tab.id != browser.activeID { browser.select(tab) }
+                browser.edit()
+                return
+            }
+            if live {
+                tab.scrollToTop()
+            } else {
+                browser.select(tab)
+            }
+        }
         .onHover { hovering = $0 }
         .contextMenu { TabMenu(browser: browser, tab: tab, close: close) }
+        .accessibilityHint(live ? "Scrolls to the top. Double-click opens the address field." : "Shows this tab. Double-click opens its address field.")
         .animation(Motion.quick, value: hovering)
-        .animation(Motion.settle, value: editing)
-        .onChange(of: browser.refusals) { _, _ in
-            guard editing else { return }
-            shake = 0
-            withAnimation(.easeOut(duration: 0.5)) { shake = 1 }
-        }
         .transition(.scale(scale: 0.94, anchor: .leading).combined(with: .opacity))
     }
 
     @ViewBuilder
     private var ground: some View {
         if live {
-            ZStack(alignment: .leading) {
-                Rectangle().fill(Palette.wash)
-                GeometryReader { geo in
-                    Rectangle()
-                        .fill(Palette.ink.opacity(0.055))
-                        .frame(width: geo.size.width * tab.reading)
-                        .animation(.easeOut(duration: 0.15), value: tab.reading)
+            if browser.insertedID == tab.id {
+                // Just inserted by `+`: a plain ground arrives with the row
+                // instead of sliding the old pill across it (the ghost).
+                ZStack(alignment: .leading) {
+                    Rectangle().fill(Palette.wash)
+                    GeometryReader { geo in
+                        Rectangle()
+                            .fill(Palette.ink.opacity(0.055))
+                            .frame(width: geo.size.width * tab.reading)
+                            .animation(.easeOut(duration: 0.15), value: tab.reading)
+                    }
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            } else {
+                ZStack(alignment: .leading) {
+                    Rectangle().fill(Palette.wash)
+                    GeometryReader { geo in
+                        Rectangle()
+                            .fill(Palette.ink.opacity(0.055))
+                            .frame(width: geo.size.width * tab.reading)
+                            .animation(.easeOut(duration: 0.15), value: tab.reading)
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .matchedGeometryEffect(id: "live", in: pill)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-            .matchedGeometryEffect(id: "live", in: pill)
         } else if hovering {
             RoundedRectangle(cornerRadius: 9, style: .continuous)
                 .fill(Palette.hover)
@@ -611,12 +644,23 @@ struct Door: View {
     let icon: String
     var on = false
     var help = ""
+    /// Website tint behind the top bar. Nil keeps the existing Palette
+    /// grounds/inks, so the sidebar and every other use stay unchanged.
+    var tint: Tint? = nil
     let act: () -> Void
 
     @State private var hovering = false
 
-    private var ink: Color { Palette.ink }
-    private var muted: Color { Palette.muted }
+    private var ink: Color { Palette.foreground(on: tint) }
+    private var muted: Color { Palette.foreground(on: tint, dimmed: true) }
+    private var lit: Color {
+        guard let tint else { return Palette.wash }
+        return Palette.foreground(on: tint).opacity(0.22)
+    }
+    private var hovered: Color {
+        guard let tint else { return Palette.hover }
+        return Palette.foreground(on: tint).opacity(0.12)
+    }
 
     var body: some View {
         Button(action: act) {
@@ -626,7 +670,7 @@ struct Door: View {
                 .frame(width: 26, height: 26)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(on ? Palette.wash : (hovering ? Palette.hover : .clear))
+                        .fill(on ? lit : (hovering ? hovered : .clear))
                 )
                 .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }

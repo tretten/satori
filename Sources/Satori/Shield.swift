@@ -100,7 +100,7 @@ final class Shield: ObservableObject {
         guard let data = try? JSONSerialization.data(withJSONObject: rules),
               let json = String(data: data, encoding: .utf8)
         else {
-            trouble = "Couldn't build the block list"
+            trouble = "Could not build the block list"
             return
         }
 

@@ -1,0 +1,23 @@
+<svg width="507" height="507" viewBox="0 0 507 507" fill="none" xmlns="http://www.w3.org/2000/svg">
+<circle cx="253.5" cy="253.5" r="253.5" fill="url(#paint0_linear_22_2)"/>
+<defs>
+<linearGradient id="paint0_linear_22_2" x1="0" y1="253.5" x2="507" y2="253.5" gradientUnits="userSpaceOnUse">
+<stop stop-color="#EAEEF2"/>
+<stop offset="0.00751407" stop-color="#EAEEF2"/>
+<stop offset="0.0291793" stop-color="#EAEEF2"/>
+<stop offset="0.06368" stop-color="#EAEEF2"/>
+<stop offset="0.109701" stop-color="#E9EDF1"/>
+<stop offset="0.165926" stop-color="#E9EDF0"/>
+<stop offset="0.23104" stop-color="#E8ECEF"/>
+<stop offset="0.303727" stop-color="#E7EAEE"/>
+<stop offset="0.382673" stop-color="#E5E9EB"/>
+<stop offset="0.46656" stop-color="#E4E6E9"/>
+<stop offset="0.554074" stop-color="#E1E4E5"/>
+<stop offset="0.643899" stop-color="#DEE0E1"/>
+<stop offset="0.73472" stop-color="#DBDCDC"/>
+<stop offset="0.825221" stop-color="#D6D7D6"/>
+<stop offset="0.914086" stop-color="#D2D2CF"/>
+<stop offset="1" stop-color="#CCCBC7"/>
+</linearGradient>
+</defs>
+</svg>

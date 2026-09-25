@@ -50,37 +50,6 @@ final class FormRelay: NSObject, WKScriptMessageHandler {
         }
     }
 
-    /// Whether to keep claiming passkeys are possible here.
-    ///
-    /// They are not, and it isn't a matter of code: Apple gates Touch ID and
-    /// iCloud passkeys inside a third-party WKWebView behind a managed
-    /// entitlement, and the cross-device route over Bluetooth behind the same
-    /// one. Measured on this machine, WebKit answers
-    /// isUserVerifyingPlatformAuthenticatorAvailable() with false.
-    ///
-    /// Meanwhile the API object exists, so sites feature-detect it, offer the
-    /// passkey path, and strand you there. Taking the object away is what sends
-    /// them straight to the password — the one that works. Turn this back on
-    /// from Settings the day the app is signed with the entitlement.
-    static var passkeysOffered: Bool {
-        get { Store.settings.bool(forKey: "passkeys") }
-        set { Store.settings.set(newValue, forKey: "passkeys") }
-    }
-
-    /// Only the passkey object goes. navigator.credentials itself stays: sites
-    /// use it for stored passwords too, and that half still works.
-    static let withoutPasskeys = """
-    (function () {
-      try {
-        Object.defineProperty(window, 'PublicKeyCredential', {
-          value: undefined, configurable: true, writable: true
-        });
-      } catch (e) {
-        try { delete window.PublicKeyCredential; } catch (ignored) {}
-      }
-    })();
-    """
-
     static let script = """
     (function () {
       if (window.__satoriForms) return;

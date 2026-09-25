@@ -11,12 +11,7 @@ final class Browser: NSObject, ObservableObject {
     @Published private(set) var tabs: [Tab] = []
     @Published var activeID: Tab.ID? {
         didSet {
-            // The strip wears the page's own colour. Follows every switch,
-            // including the first tab — subscribing sends the tab's current
-            // state straight away.
-            if let id = activeID, let tab = tabs.first(where: { $0.id == id }) {
-                tintWatch = tab.$themeColor.sink { [weak self] in self?.themeColor = $0 }
-            }
+            watchTint()
             // The tab just left is the tab just looked at. Whether a tab has
             // gone unwatched long enough to sleep is counted from here, not
             // from when it was first picked.
@@ -27,8 +22,54 @@ final class Browser: NSObject, ObservableObject {
 
     /// The page's own colour at its top, worn by the strip so it reads as the
     /// page continuing upward.
-    @Published private(set) var themeColor: Color?
+    @Published private(set) var themeColor: Tint?
     private var tintWatch: AnyCancellable?
+
+    /// The strip wears the active page's own colour. Subscribing sends the
+    /// tab's current state straight away, so this also catches the switch up.
+    /// Called from `didSet` — which Swift skips while `init` is still running,
+    /// so `init` calls it from its own `defer` instead.
+    ///
+    /// Gated on `prefs.adaptive`: with it off nothing is published and every
+    /// tinted surface falls back to the plain Palette. The tint computation
+    /// in Tab is untouched.
+    private func watchTint() {
+        if let id = activeID, let tab = tabs.first(where: { $0.id == id }) {
+            tintWatch = tab.$themeColor.sink { [weak self] tint in
+                guard let self else { return }
+                self.themeColor = self.prefs.adaptive ? tint : nil
+            }
+        } else {
+            tintWatch = nil
+            themeColor = nil
+        }
+    }
+
+    /// Re-read the active tab's tint through the adaptive gate. Called when
+    /// the checkbox flips so the live UI updates without a reload.
+    private func refreshTint() {
+        guard prefs.adaptive, let id = activeID,
+              let tab = tabs.first(where: { $0.id == id })
+        else {
+            themeColor = nil
+            return
+        }
+        themeColor = tab.themeColor
+    }
+
+    /// The tab just created by `+` (or any foreground insertion) while its
+    /// appear transition is still running. Views keep the live-pill slide and
+    /// the animated reveal off until this clears, so only one live pill is
+    /// ever rendered during the transition.
+    @Published var insertedID: Tab.ID?
+    /// Holds `insertedID` past the insertion transaction, then lets it go.
+    /// One id at a time is enough: a second `+` simply re-arms the same hush.
+    func noteInserted(_ id: Tab.ID) {
+        insertedID = id
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
+            if self?.insertedID == id { self?.insertedID = nil }
+        }
+    }
 
     /// The tab whose page is currently out in the little window. Nothing
     /// floating means no window: the two are checked against each other rather
@@ -299,7 +340,7 @@ final class Browser: NSObject, ObservableObject {
         suggesting = nil
         pickedInto = tab.id
         tab.fill(user: login.user, password: login.password) { [weak self] worked in
-            if !worked { self?.announce("Couldn't find the sign-in fields anymore") }
+            if !worked { self?.announce("The sign-in fields are gone") }
         }
         Vault.touch(login)
     }
@@ -392,7 +433,7 @@ final class Browser: NSObject, ObservableObject {
         panel.message = "A passwords export, as Chrome, Dia or Google Password Manager write it."
         guard panel.runModal() == .OK, let url = panel.url else { return }
         guard let text = try? String(contentsOf: url, encoding: .utf8) else {
-            announce("Couldn't read that file as text")
+            announce("That file could not be read as text")
             return
         }
         let result = Vault.take(csv: text)
@@ -548,38 +589,6 @@ final class Browser: NSObject, ObservableObject {
         rememberSession()
     }
 
-    // MARK: - the address, in the tab itself
-
-    /// Clicking the tab you are already on turns it into the address, short
-    /// form, ready to be changed.
-    @Published private(set) var editingTab: Tab.ID?
-    @Published var tabDraft = ""
-
-    func beginTabEdit(_ tab: Tab) {
-        guard let url = tab.address else {
-            edit()
-            return
-        }
-        tabDraft = Address.pretty(url)
-        editingTab = tab.id
-    }
-
-    func commitTabEdit() {
-        guard let id = editingTab, let tab = tabs.first(where: { $0.id == id }) else { return }
-        guard let url = Engine.destination(for: tabDraft) else {
-            // Stay put and say so, rather than quietly throwing the edit away.
-            refusals += 1
-            return
-        }
-        editingTab = nil
-        tab.go(to: url)
-    }
-
-    func cancelTabEdit() {
-        editingTab = nil
-        tabDraft = ""
-    }
-
     // MARK: - saying so
 
     /// A line that rises from the bottom, says one thing, and leaves.
@@ -637,9 +646,6 @@ final class Browser: NSObject, ObservableObject {
         if #available(macOS 15.4, *) { Extensions.shared.start(for: self) }
         if prefs.bench { Bench.shared.start(for: self) }
         welcoming = !prefs.welcomed
-        // Once a day, quietly: is there a newer one?
-        Updater.shared.checkIfDue { [weak self] line in self?.announce(line) }
-        FormRelay.passkeysOffered = prefs.passkeys
 
         // The History menu lists what the history holds, and the menu is drawn
         // from this object's changes — so the history's are passed on.
@@ -712,6 +718,7 @@ final class Browser: NSObject, ObservableObject {
         // drawn — so the first address you type navigates instead of waiting
         // for WebKit to get up.
         defer {
+            watchTint()
             follow()
             watchForSleep()
         }
@@ -759,12 +766,12 @@ final class Browser: NSObject, ObservableObject {
                 guard let self else { return }
                 Shield.shared.enabled = on
                 Shield.shared.apply(to: tabs.compactMap { $0.built?.configuration.userContentController })
-                announce(on ? "Ads and trackers blocked" : "Blocking off — reload to see the difference")
+                announce(on ? "Ads and trackers blocked" : "Blocking is off. Reload to see.")
             }
             .store(in: &bag)
 
         // The look changes — from Settings, or from the Mac while set to
-        // System — and the icons a site keeps for each scheme change with it.
+        // Auto — and the icons a site keeps for each scheme change with it.
         // A beat after, so the appearance has actually turned over.
         prefs.$look
             .dropFirst()
@@ -780,27 +787,19 @@ final class Browser: NSObject, ObservableObject {
             }
             .store(in: &bag)
 
+        // The adaptive checkbox flips the gate on the live tint: on re-reads
+        // the active tab, off clears to the plain Palette. No reload.
+        prefs.$adaptive
+            .dropFirst()
+            .sink { [weak self] _ in self?.refreshTint() }
+            .store(in: &bag)
+
         prefs.$bench
             .dropFirst()
             .sink { [weak self] on in
                 guard let self else { return }
                 if on { Bench.shared.start(for: self) } else { Bench.shared.stop() }
-                announce(on ? "Scripts can drive Satori — see ./bench" : "The bench is closed")
-            }
-            .store(in: &bag)
-
-        prefs.$passkeys
-            .dropFirst()
-            .sink { [weak self] on in
-                guard let self else { return }
-                FormRelay.passkeysOffered = on
-                // Each tab keeps whatever is hidden on the site it is showing:
-                // re-arming with nothing would quietly restore every element
-                // this person had taken off, everywhere.
-                for tab in tabs {
-                    tab.arm(hiding: curtain.css(on: curtain.host(of: tab.address)))
-                }
-                announce(on ? "Passkeys offered again — reload the page" : "Sites will ask for a password instead")
+                announce(on ? "Scripts can drive Satori. See ./bench" : "The bench is closed")
             }
             .store(in: &bag)
 
@@ -890,6 +889,7 @@ final class Browser: NSObject, ObservableObject {
             return
         }
         let tab = Tab()
+        noteInserted(tab.id)
         adopt(tab)
         leaving()
         activeID = tab.id
@@ -911,14 +911,15 @@ final class Browser: NSObject, ObservableObject {
         prepare(page)
         tabs[index] = page
         page.go(to: url)
-        if activeID == tab.id { activeID = page.id; editing = false }
+        if activeID == tab.id { noteInserted(page.id); activeID = page.id; editing = false }
     }
 
     func select(_ tab: Tab) {
-        cancelTabEdit()
         summoning = false
         suggesting = nil
         guard tab.id != activeID else { return }
+        active?.clearHover()
+        tab.clearHover()
         // Coming back to the tab whose video is out brings it home first, so
         // it is never lifted and landed in the same breath.
         if floating == tab.id { land() }
@@ -930,6 +931,9 @@ final class Browser: NSObject, ObservableObject {
         // wake is this the other case, one whose page quietly died while you
         // were elsewhere, which revive() checks for on its own.
         if !tab.wake() { tab.revive() }
+        // The tab just looked at gets asked once whether anything on it
+        // could be floated; the load finishing says again (see didFinish).
+        tab.refreshFloatAvailability()
         rememberSession()
         editing = false
         typed = ""
@@ -971,6 +975,7 @@ final class Browser: NSObject, ObservableObject {
                 NSApp.keyWindow?.performClose(nil)
             } else {
                 let fresh = Tab()
+                noteInserted(fresh.id)
                 remember(tab, at: 0)
                 tab.close()
                 adopt(fresh)
@@ -1037,6 +1042,7 @@ final class Browser: NSObject, ObservableObject {
         ghosts.removeAll { $0.id == ghost.id }
         let tab = Tab()
         prepare(tab)
+        noteInserted(tab.id)
         leaving()
         tabs.insert(tab, at: min(ghost.index, tabs.count))
         activeID = tab.id
@@ -1090,6 +1096,7 @@ final class Browser: NSObject, ObservableObject {
         tabs.insert(tab, at: here.map { $0 + 1 } ?? tabs.count)
         tab.go(to: url)
         if foreground {
+            noteInserted(tab.id)
             leaving()
             activeID = tab.id
             editing = false
@@ -1107,6 +1114,7 @@ final class Browser: NSObject, ObservableObject {
 
     /// The configuration for an extension's page, or nil for anything else.
     static func extensionConfiguration(for url: URL) -> WKWebViewConfiguration? {
+        if EXTENSIONS_HIDDEN { return nil }
         guard #available(macOS 15.4, *) else { return nil }
         let url = Extensions.current(url)
         guard url.scheme == Extensions.scheme else { return nil }
@@ -1155,6 +1163,7 @@ final class Browser: NSObject, ObservableObject {
     /// history, and no place in tomorrow's session.
     func newShyTab() {
         let tab = Tab(shy: true)
+        noteInserted(tab.id)
         adopt(tab)
         leaving()
         activeID = tab.id
@@ -1230,11 +1239,16 @@ final class Browser: NSObject, ObservableObject {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 guard (answer as? String) == "floating" else {
+                    // A manual attempt that found nothing playing: hide the
+                    // icon again rather than leaving it up. The announcement
+                    // is the existing fallback, kept as is.
+                    tab.canFloat = false
                     if !quietly { self.announce("Nothing is playing here") }
                     return
                 }
                 self.floating = tab.id
                 tab.floating = true
+                tab.canFloat = true
                 self.floater.lift(tab.web)
             }
         }
@@ -1249,7 +1263,11 @@ final class Browser: NSObject, ObservableObject {
         guard let id = floating, let tab = tabs.first(where: { $0.id == id }) else { return }
         floating = nil
         tab.floating = false
-        tab.web.evaluateJavaScript(Isolate.off)
+        // Landing changes nothing about whether the video is still playing:
+        // ask again so the icon stays only if floating still would work.
+        tab.web.evaluateJavaScript(Isolate.off) { [weak tab] _, _ in
+            MainActor.assumeIsolated { tab?.refreshFloatAvailability() }
+        }
     }
 
     private func prepare(_ tab: Tab) {
@@ -1260,7 +1278,7 @@ final class Browser: NSObject, ObservableObject {
             let css = curtain.css(on: host)
             tab.arm(hiding: css)
             tab.applyVeils(css)
-            announce("Hidden — ⌘Z puts it back")
+            announce("Hidden. ⌘Z brings it back.")
         }
         tab.onPickEnd = { [weak self] _ in self?.veiling = false }
         tab.onImageMenu = { [weak self] tab, url in self?.showImageMenu(for: tab, at: url) }
@@ -1313,7 +1331,7 @@ final class Browser: NSObject, ObservableObject {
             offering = offer
         }
         tab.onPickTrouble = { [weak self] _, reason in
-            self?.announce("Couldn't hide that — \(reason)")
+            self?.announce("Could not hide that: \(reason)")
         }
 
         // The line at the bottom doubles as the zoom read-out: it keeps being
@@ -1365,7 +1383,6 @@ final class Browser: NSObject, ObservableObject {
     /// ⌘K. Only what is open, nothing else.
     func summon() {
         reviewing = false
-        cancelTabEdit()
         summoning = true
         typed = ""
         editing = true
@@ -1548,7 +1565,7 @@ final class Browser: NSObject, ObservableObject {
         guard let tab = active else { return }
         tab.toggleReader { [weak self] worked in
             guard !worked else { return }
-            self?.announce("Nothing to read on this page")
+            self?.announce("Nothing to read here")
         }
     }
 
@@ -1607,6 +1624,10 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
         // The next document gets this site's stylesheet of hidden things,
         // decided here because here is the last moment before it loads.
         if action.targetFrame?.isMainFrame ?? true, let tab = tab(for: webView) {
+            // A new document means a new page: whatever was floatable before
+            // is gone until the new page says otherwise.
+            tab.clearFloatAvailability()
+            tab.clearHover()
             let host = curtain.host(of: url)
             tab.arm(hiding: curtain.css(on: host))
             // And the blocker, on or off for where it is going.
@@ -1768,6 +1789,13 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         guard let tab = tab(for: webView) else { return }
+        // Eager strip inset at commit: the document is starting and the
+        // SwiftUI update cycle may not have run with the right value yet.
+        // Floating-aware (0 while floated, including first-load-then-float),
+        // idempotent and main-thread.
+        tab.applyTopInsetNow()
+        tab.clearFloatAvailability()
+        tab.clearHover()
         tab.failure = nil
         tab.failureCode = nil
         tab.typing = false
@@ -1784,7 +1812,14 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         guard let tab = tab(for: webView), let url = tab.address else { return }
+        // Re-assert at finish for first loads whose early frames rendered
+        // before the update path delivered the inset. Floating-aware.
+        tab.applyTopInsetNow()
         tab.uncover()
+        // Active-tab scoped: a background tab that just finished says nothing
+        // until it is looked at (see select(_:)), so loads never fan out
+        // into probes across the row.
+        if tab.id == activeID { tab.refreshFloatAvailability() }
         tellStore(tab)
         // A page that arrived after a password went out: did the sign-in take?
         tab.settleSignIn()
@@ -1813,6 +1848,7 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
         guard !handedOver else { return }
         tab(for: webView)?.failure = message(for: code)
         tab(for: webView)?.failureCode = "\(nsError.domain) \(code)"
+        tab(for: webView)?.clearFloatAvailability()
     }
 
     private func message(for code: Int) -> String {

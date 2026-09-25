@@ -7,12 +7,12 @@ import Foundation
 // what can't be a place gets searched.
 
 enum Engine: String, CaseIterable, Identifiable {
-    case google, duckduckgo, brave, bing, kagi, ecosia, startpage, yahoo
+    case duckduckgo, google, brave, bing, kagi, ecosia, startpage, yahoo
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .google: return "Google"
         case .duckduckgo: return "DuckDuckGo"
+        case .google: return "Google"
         case .brave: return "Brave Search"
         case .bing: return "Bing"
         case .kagi: return "Kagi"
@@ -23,9 +23,9 @@ enum Engine: String, CaseIterable, Identifiable {
     }
 
     /// The engine answering now, for the field and the suggestions alike.
-    /// Google unless asked otherwise.
+    /// DuckDuckGo unless asked otherwise.
     static var current: Engine {
-        Engine(rawValue: Store.settings.string(forKey: "engine") ?? "") ?? .google
+        Engine(rawValue: Store.settings.string(forKey: "engine") ?? "") ?? .duckduckgo
     }
 
     /// A place if it can be one, a search if it can't.
@@ -48,8 +48,8 @@ enum Engine: String, CaseIterable, Identifiable {
 
     private var query: String {
         switch self {
-        case .google: return "https://www.google.com/search?q="
         case .duckduckgo: return "https://duckduckgo.com/?q="
+        case .google: return "https://www.google.com/search?q="
         case .brave: return "https://search.brave.com/search?q="
         case .bing: return "https://www.bing.com/search?q="
         case .kagi: return "https://kagi.com/search?q="

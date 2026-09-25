@@ -22,12 +22,12 @@ enum Crx {
 
         var errorDescription: String? {
             switch self {
-            case .notAnID: return "That isn't a Chrome Web Store link or extension id"
+            case .notAnID: return "That is not a Chrome Web Store link or extension id"
             case .download(let code): return "The Chrome Web Store answered \(code)"
-            case .empty: return "The Chrome Web Store has nothing for that id — it may have been taken down, or only exist for old versions of Chrome"
-            case .notCrx: return "What came back isn't a Chrome extension"
-            case .unsignedOrWrong: return "The extension's signature doesn't hold up"
-            case .unpack: return "The extension couldn't be unpacked"
+            case .empty: return "The Chrome Web Store has nothing for that id. It may have been taken down, or made for an old Chrome."
+            case .notCrx: return "What came back is not a Chrome extension"
+            case .unsignedOrWrong: return "The extension signature does not hold up"
+            case .unpack: return "The extension could not be unpacked"
             }
         }
     }

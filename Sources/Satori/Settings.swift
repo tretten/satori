@@ -9,7 +9,6 @@ struct SettingsPanel: View {
     @ObservedObject var browser: Browser
     @ObservedObject var prefs: Preferences
 
-    @ObservedObject private var updater = Updater.shared
     @ObservedObject private var shield = Shield.shared
     @State private var isDefault = Links.isDefault
     @State private var page: Page = Page(rawValue: Store.settings.string(forKey: "settings.page") ?? "") ?? .general
@@ -75,7 +74,8 @@ struct SettingsPanel: View {
                 .padding(.horizontal, 10)
                 .padding(.top, 14)
                 .padding(.bottom, 12)
-            ForEach(Page.allCases) { item in
+            // Hidden for the first public release: no Extensions row.
+            ForEach(Page.allCases.filter { !EXTENSIONS_HIDDEN || $0 != .extensions }) { item in
                 PageRow(page: item, on: page == item) { page = item }
             }
             Spacer(minLength: 0)
@@ -170,21 +170,25 @@ struct SettingsPanel: View {
                     Pill("Make default", filled: true) {
                         Links.becomeDefault { worked in
                             isDefault = Links.isDefault
-                            browser.announce(worked && isDefault ? "Links now open here" : "macOS didn't change it")
+                            browser.announce(worked && isDefault ? "Links now open here" : "macOS left it as it was")
                         }
                     }
                 }
             }
             Rule()
-            Line("Appearance", "Light, dark, or whatever the Mac is doing — pages follow it too") {
+            Line("Appearance", "Dark, light, or what the Mac does. Pages follow it too") {
                 Segmented(options: Look.allCases.map { ($0, $0.title) }, selection: $prefs.look)
             }
             Rule()
-            Line("Correct spelling as you type", "macOS's autocorrect inside pages — the one that capitalises for you") {
+            Line("Adaptive", "The top bar takes the colour of the page. Turn off to keep it plain.") {
+                Switch(on: $prefs.adaptive)
+            }
+            Rule()
+            Line("Correct spelling as you type", "macOS autocorrect in pages. It capitalises for you.") {
                 Switch(on: $prefs.autocorrect)
             }
             Rule()
-            Line("Let a script drive Satori", "A local socket for testing. Its tabs open beside yours with a flask on them and never take over — see ./bench") {
+            Line("Let a script drive Satori", "A local socket for testing. Its tabs open beside yours with a flask on them and never take over. See ./bench") {
                 Switch(on: $prefs.bench)
             }
             Rule()
@@ -202,14 +206,14 @@ struct SettingsPanel: View {
 
     private var tabs: some View {
         Card {
-            Line("Tabs in a sidebar", "Down the left instead of across the top. Pull its edge to make it wider; double-click the edge to reset.") {
+            Line("Tabs in a sidebar", "Down the left instead of across the top. Pull the edge to widen it. Double-click the edge to reset.") {
                 Switch(on: Binding(
                     get: { prefs.sidebar },
                     set: { on in withAnimation(Motion.settle) { prefs.sidebar = on } }
                 ))
             }
             Rule()
-            Line("Sleep tabs you aren't using", "After half an hour away they come back where you left them. Pinned tabs, sound, calls and anything typed stay awake.") {
+            Line("Sleep tabs you do not use", "After half an hour away they return where you left them. Pinned tabs, sound, calls and anything typed stay awake.") {
                 Switch(on: $prefs.sleepsTabs)
             }
         }
@@ -219,8 +223,8 @@ struct SettingsPanel: View {
 
     /// Says so when a password manager extension has taken the saving over.
     private var savingDetail: String {
-        if #available(macOS 15.4, *), let name = Extensions.shared.passwordSavingTakenBy {
-            return "\(name) does the saving — it asked Satori not to offer"
+        if !EXTENSIONS_HIDDEN, #available(macOS 15.4, *), let name = Extensions.shared.passwordSavingTakenBy {
+            return "\(name) does the saving. It asked Satori not to offer."
         }
         return "Asked once per site, never again for a site you refuse"
     }
@@ -242,15 +246,6 @@ struct SettingsPanel: View {
                 Line("Fill in sign-ins", "Click a sign-in box and the accounts kept for the site hang from it") {
                     Switch(on: $prefs.fillsPasswords)
                 }
-                Rule()
-                Line(
-                    "Offer passkeys",
-                    prefs.passkeysPossible
-                        ? "Touch ID or an iCloud passkey, on sites that offer one"
-                        : "Needs an Apple entitlement this build doesn't have — off keeps sites to the password"
-                ) {
-                    Switch(on: $prefs.passkeys)
-                }
                 if !Vault.never.isEmpty {
                     Rule()
                     Line("Sites never asked", "\(Vault.never.count) sites told to stop offering") {
@@ -262,7 +257,7 @@ struct SettingsPanel: View {
                 }
             }
             Card {
-                Line("Bring yours in", "From Dia, Chrome, Arc, Brave or Edge on this Mac — nothing leaves it") {
+                Line("Bring yours in", "From Dia, Chrome, Arc, Brave or Edge on this Mac. Nothing leaves it.") {
                     Pill("Import…") {
                         browser.tuning = false
                         browser.managing = true
@@ -344,13 +339,13 @@ struct SettingsPanel: View {
                 }
                 if let trouble = shield.trouble {
                     Rule()
-                    Line(trouble, "Nothing is being blocked until this clears — try again, or restart Satori") {
+                    Line(trouble, "Nothing is blocked until this clears. Try again, or restart Satori.") {
                         Pill("Try again") { shield.compile() }
                     }
                 }
                 if let host = browser.hereHost, prefs.shielded, shield.trouble == nil {
                     Rule()
-                    Line("Block on \(host)", "Turn off here if the site breaks — the page reloads") {
+                    Line("Block on \(host)", "Turn off here if the site breaks. The page reloads.") {
                         Switch(on: Binding(
                             get: { !Shield.shared.isPaused(on: host) },
                             set: { on in
@@ -383,18 +378,25 @@ struct SettingsPanel: View {
 
     // MARK: - about
 
+    /// What this app is: the version people read, and the build Sparkle
+    /// compares to tell newer from older.
+    private static var version: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
+    }
+
+    private static var build: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
+    }
+
     private var about: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 14) {
-                Logomark()
-                    .fill(Palette.ink, style: FillStyle(eoFill: true))
-                    .aspectRatio(Logomark.canvas.width / Logomark.canvas.height, contentMode: .fit)
-                    .frame(height: 34)
+                AppIcon(size: 34)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Satori")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Palette.ink)
-                    Text(verbatim: "by tretten · version \(Updater.version) (\(Updater.build))")
+                    Text(verbatim: "by tretten · version \(Self.version) (\(Self.build))")
                         .font(.system(size: 12))
                         .foregroundStyle(Palette.muted)
                 }
@@ -402,58 +404,24 @@ struct SettingsPanel: View {
             .padding(.bottom, 2)
 
             Card {
-                Line(versionTitle, versionDetail) { versionControl }
+                Line(
+                    "Check for updates automatically",
+                    prefs.automaticallyChecksForUpdates
+                        ? "Checked every day, installed when Satori quits"
+                        : "Only when you press the button below"
+                ) {
+                    Switch(on: $prefs.automaticallyChecksForUpdates)
+                }
+                Rule()
+                Line("Updates", "A newer Satori downloads quietly and waits for a quit") {
+                    Pill("Check for Updates…") {
+                        UpdaterController.shared.checkForUpdates(nil)
+                    }
+                }
                 Rule()
                 Line("Found something wrong?", "Opens a draft with the version already in it") {
                     Pill("Send Feedback") { Links.writeFeedback() }
                 }
-            }
-        }
-    }
-
-    /// The version line follows the newer build from found to fetched to
-    /// in place; with none, it is simply this one.
-    private var versionTitle: String {
-        switch updater.stage {
-        case .none: return "Updates"
-        case .fetching(let next): return "Satori \(next.version) is downloading…"
-        case .ready(let next): return "Satori \(next.version) is ready"
-        case .offered(let next): return "Satori \(next.version) is out"
-        }
-    }
-
-    private var versionDetail: String {
-        switch updater.stage {
-        case .none:
-            return updater.lastChecked.map { "Checked \($0.formatted(.relative(presentation: .named))) — once a day on its own" }
-                ?? "Checked once a day on its own"
-        case .fetching(let next):
-            return next.notes ?? "Quietly, in the background — nothing you have set is touched"
-        case .ready(let next):
-            return next.notes ?? "It's there the next time you open Satori"
-        case .offered(let next):
-            return next.notes ?? "Open the disk image, the same as the first time"
-        }
-    }
-
-    @ViewBuilder
-    private var versionControl: some View {
-        switch updater.stage {
-        case .none:
-            Pill(updater.checking ? "Checking…" : "Check now") {
-                updater.check { found in
-                    if found == nil { browser.announce("This is the latest one") }
-                }
-            }
-            .disabled(updater.checking)
-        case .fetching:
-            Ring(size: 12)
-        case .ready:
-            Pill("Relaunch now", filled: true) { updater.relaunch() }
-        case .offered(let next):
-            Pill("Download", filled: true) {
-                browser.tuning = false
-                browser.open(next.dmg, foreground: true)
             }
         }
     }

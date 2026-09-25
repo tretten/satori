@@ -8,7 +8,7 @@ import AppKit
 // Every colour is a pair — one for a light window, one for a dark — and
 // resolves itself against whatever appearance the window has. The window
 // takes its appearance from the app, and the app from Settings › Appearance:
-// light, dark, or whatever the Mac is doing. Nothing else in the code knows
+// dark, light, or whatever the Mac is doing. Nothing else in the code knows
 // which it is.
 enum Palette {
     static let ground = Color(nsColor: NS.ground)
@@ -39,11 +39,57 @@ enum Palette {
             }
         }
     }
+
+    /// Opaque text and vector icons that sit on a website tint.
+    ///
+    /// Nil tint means no usable page colour: the caller keeps `ink`/`muted`.
+    /// Otherwise WCAG black-versus-white selection — white wins below a
+    /// relative luminance of ~0.179, where the two contrasts cross — with the
+    /// idle variant dimmed to 0.65 so live (1.0) > hover (0.7) > idle keeps
+    /// the row's existing hierarchy.
+    static func foreground(on tint: Tint?, dimmed: Bool = false) -> Color {
+        guard let tint else { return dimmed ? muted : ink }
+        let base: Color = tint.luminance > 0.179 ? .black : .white
+        return dimmed ? base.opacity(0.65) : base
+    }
 }
 
-/// Light, dark, or the Mac's own — the one choice that colours everything.
+/// A website-provided opaque tint: sRGB components plus WCAG luminance.
+///
+/// Kept as numbers rather than reading them back out of a `Color`, which
+/// cannot reliably round-trip under dynamic macOS appearance. `color` is the
+/// opaque SwiftUI colour worn by the bar; `luminance` drives the contrast
+/// helper above.
+struct Tint: Equatable {
+    let red: Double
+    let green: Double
+    let blue: Double
+
+    init(red: Double, green: Double, blue: Double) {
+        self.red = min(1, max(0, red))
+        self.green = min(1, max(0, green))
+        self.blue = min(1, max(0, blue))
+    }
+
+    /// Bytes from page JS (0...255).
+    init(bytes r: Double, g: Double, b: Double) {
+        self.init(red: r / 255, green: g / 255, blue: b / 255)
+    }
+
+    var color: Color { Color(red: red, green: green, blue: blue) }
+
+    /// WCAG relative luminance, 0...1.
+    var luminance: Double {
+        func lin(_ c: Double) -> Double {
+            c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+        }
+        return 0.2126 * lin(red) + 0.7152 * lin(green) + 0.0722 * lin(blue)
+    }
+}
+
+/// Dark, light, or the Mac's own — the one choice that colours everything.
 enum Look: String, CaseIterable, Identifiable {
-    case light, dark, system
+    case dark, light, system
 
     var id: String { rawValue }
 
@@ -51,7 +97,7 @@ enum Look: String, CaseIterable, Identifiable {
         switch self {
         case .light: return "Light"
         case .dark: return "Dark"
-        case .system: return "System"
+        case .system: return "Auto"
         }
     }
 
@@ -92,10 +138,11 @@ enum Metrics {
     /// the strip.
     static let pageInset: CGFloat = 0
     static let pageRadius: CGFloat = 4
-    /// Where the first tab starts. The traffic lights run from 12 to 106 —
-    /// measured, not guessed — so this leaves them the same air on their right
-    /// that the window gives them on their left.
-    static let lights: CGFloat = 115
+    /// Where the helm starts. The traffic lights are hand-placed (Lights.centre
+    /// x 21, spacing 20, ~12pt buttons: right edge ~67), so this leaves them
+    /// ~11 of air on their right — close to the window's own left air — and
+    /// puts back/forward right after the lights.
+    static let lights: CGFloat = 78
     /// Back and forward: two doors and the air before the next
     /// one. In the strip they stand right after the lights; in the sidebar
     /// right of them instead.
@@ -147,82 +194,27 @@ struct Pressable: ButtonStyle {
     }
 }
 
-/// Satori's mark — Drice's Subtract.svg, a pill with an S cut out of it,
-/// read from its own path data rather than loaded from a file, so it stays a
-/// crisp vector at any size. No plate, no square behind it: the mark draws exactly
-/// what the source file has and nothing it doesn't, the way every other icon
-/// in this app is a bare shape rather than a shape on a background. The one
-/// exception is the macOS app icon (`Icon/icon.swift`), which needs an
-/// opaque square whether the mark wants one or not — that's the Dock's
-/// requirement, not the logo's.
-struct Logomark: Shape {
-    /// The source's own canvas: Subtract.svg, 608 × 276, nothing outside it.
-    static let canvas = CGSize(width: 608, height: 276)
-
-    /// A pill with an S cut out of it. The same path as Icon/icon.swift and
-    /// the website's mark.
-    private static let data = "M469.443 0C545.471 0.00013198 607.103 61.6325 607.104 137.66C607.104 213.688 545.471 275.321 469.443 275.321H137.66C61.6323 275.321 0 213.688 0 137.66C0.00016085 61.6325 61.6325 0.000140192 137.66 0H469.443ZM138.104 51.5977C127.234 51.5977 117.512 53.5115 108.938 57.3389C100.518 61.0132 93.8581 66.2188 88.959 72.9551C84.2132 79.5381 81.8398 87.3464 81.8398 96.3789C81.8399 105.258 83.6773 112.607 87.3516 118.425C91.0258 124.089 95.9251 128.682 102.049 132.203C108.173 135.571 114.833 138.327 122.028 140.471L151.652 149.197C158.389 151.188 163.9 154.249 168.187 158.383C172.473 162.516 174.617 168.028 174.617 174.917C174.617 182.572 171.402 188.849 164.972 193.748C158.695 198.494 150.122 200.867 139.252 200.867C132.21 200.867 125.702 199.413 119.731 196.504C113.914 193.442 109.091 189.308 105.264 184.103C101.436 178.744 99.2169 172.697 98.6045 165.961H97.6855L75.4102 171.013C76.3287 180.658 79.697 189.308 85.5146 196.963C91.3322 204.618 98.9103 210.665 108.249 215.104C117.741 219.544 128.076 221.765 139.252 221.765C151.193 221.765 161.68 219.774 170.713 215.794C179.746 211.813 186.711 206.225 191.61 199.029C196.662 191.834 199.188 183.414 199.188 173.769C199.188 164.124 197.352 156.239 193.678 150.115C190.003 143.838 185.104 138.863 178.98 135.188C172.857 131.514 166.044 128.605 158.542 126.462L128.229 117.735C121.799 115.898 116.516 113.219 112.383 109.698C108.402 106.177 106.412 101.354 106.412 95.2305C106.412 88.188 109.168 82.6758 114.68 78.6953C120.344 74.5619 128.152 72.4951 138.104 72.4951C147.901 72.4952 155.939 74.9448 162.216 79.8438C168.493 84.7428 172.397 91.1729 173.928 99.1338H174.847L196.663 93.8525C195.745 85.5853 192.605 78.3131 187.247 72.0361C181.889 65.6061 174.923 60.6306 166.35 57.1094C157.929 53.4351 148.514 51.5977 138.104 51.5977Z"
-
-    func path(in rect: CGRect) -> Path {
-        // Fit the canvas into whatever frame this is given, centred, at the
-        // larger scale that still keeps it inside — an SVG viewBox's "meet".
-        let scale = min(rect.width / Logomark.canvas.width, rect.height / Logomark.canvas.height)
-        let ox = rect.midX - Logomark.canvas.width * scale / 2
-        let oy = rect.midY - Logomark.canvas.height * scale / 2
-        func pt(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: ox + x * scale, y: oy + y * scale) }
-        var path = Path()
-        var last = CGPoint.zero
-        var start = CGPoint.zero
-        for (c, n) in Logomark.commands {
-            switch c {
-            case "M": last = CGPoint(x: n[0], y: n[1]); start = last; path.move(to: pt(n[0], n[1]))
-            case "L": last = CGPoint(x: n[0], y: n[1]); path.addLine(to: pt(n[0], n[1]))
-            case "H": last.x = n[0]; path.addLine(to: pt(last.x, last.y))
-            case "V": last.y = n[0]; path.addLine(to: pt(last.x, last.y))
-            case "C":
-                var k = 0
-                while k + 5 < n.count {
-                    path.addCurve(to: pt(n[k + 4], n[k + 5]), control1: pt(n[k], n[k + 1]), control2: pt(n[k + 2], n[k + 3]))
-                    last = CGPoint(x: n[k + 4], y: n[k + 5])
-                    k += 6
-                }
-            case "Z": path.closeSubpath(); last = start
-            default: break
-            }
-        }
-        return path
-    }
-
-    /// Read once. Absolute M, L, H, V, C, Z — what Figma writes for a
-    /// flattened shape, and nothing else is needed.
-    private static let commands: [(Character, [CGFloat])] = {
-        var out: [(Character, [CGFloat])] = []
-        var current: Character?
-        var numbers: [CGFloat] = []
-        var token = ""
-        func flush() {
-            if !token.isEmpty, let v = Double(token) { numbers.append(CGFloat(v)) }
-            token = ""
-        }
-        for ch in data {
-            if "MLHVCZ".contains(ch) {
-                flush()
-                if let current { out.append((current, numbers)) }
-                current = ch
-                numbers = []
-            } else if ch == " " || ch == "," {
-                flush()
-            } else if ch == "-" && !token.isEmpty {
-                flush()
-                token = "-"
+/// The app's own icon, for the welcome walk and the About page — the bundle
+/// icon already on the Dock, not a separate mark. Falls back to a neutral
+/// glyph when the bundle icon isn't there (tests, previews).
+struct AppIcon: View {
+    var size: CGFloat
+    var body: some View {
+        Group {
+            if let icon = NSApp.applicationIconImage {
+                Image(nsImage: icon)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: size, height: size)
+                    .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
             } else {
-                token.append(ch)
+                Image(systemName: "globe")
+                    .font(.system(size: size * 0.7))
+                    .foregroundStyle(Palette.muted)
+                    .frame(width: size, height: size)
             }
         }
-        flush()
-        if let current { out.append((current, numbers)) }
-        return out
-    }()
+    }
 }
 
 /// Wrong address, said without a dialog: the field shivers and stops.

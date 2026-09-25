@@ -164,7 +164,7 @@ extension Browser {
         alert.messageText = "\(space.host) asks you to sign in"
         alert.informativeText = space.realm.map { "“\($0)”" } ?? "The site wants a name and a password."
         if challenge.previousFailureCount > 0 {
-            alert.informativeText += "\nThat wasn't accepted — try again."
+            alert.informativeText += "\nThat was not accepted. Try again."
         }
         alert.addButton(withTitle: "Sign In")
         alert.addButton(withTitle: "Cancel")
@@ -205,6 +205,7 @@ extension Browser {
         if tab.id == activeID, !tab.isBlank {
             tab.recoverFromCrash()
         } else {
+            tab.clearFloatAvailability()
             tab.stale = true
         }
     }
@@ -217,7 +218,7 @@ extension Browser {
     func confirmClearHistory() {
         let alert = NSAlert()
         alert.messageText = "Clear all history?"
-        alert.informativeText = "Everywhere you have been is removed and can't be put back."
+        alert.informativeText = "Every place you visited is removed. It cannot be undone."
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Clear History")
         alert.addButton(withTitle: "Cancel")

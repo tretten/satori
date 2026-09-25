@@ -7,6 +7,27 @@ import AppKit
 // plist); this is the other half. Addresses can arrive before the window has
 // been built, so they wait here until the browser says it is ready for them.
 
+/// Quit confirmation state, shared by the menu command and the delegate.
+enum QuitConfirmation {
+    /// Set once the user has confirmed, so the continued terminate isn't asked again.
+    static var confirmed = false
+    /// True while the confirmation sheet is up, so a second quit doesn't open another.
+    static var asking = false
+    /// Set for one terminate that isn't a quit (update relaunch) so it skips the dialog.
+    static var bypassOnce = false
+
+    /// The native confirmation dialog: exact message, Quit/Cancel actions.
+    /// VoiceOver reads the message and both button titles; nothing custom drawn.
+    static func alert() -> NSAlert {
+        let alert = NSAlert()
+        alert.messageText = "Are you sure you want to quit?"
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Quit")
+        alert.addButton(withTitle: "Cancel")
+        return alert
+    }
+}
+
 final class Links: NSObject, NSApplicationDelegate {
     /// Where an address goes once there is somewhere for it to go.
     private static var deliver: ((URL) -> Void)?
@@ -24,6 +45,39 @@ final class Links: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         Links.flush?()
+    }
+
+    /// Every quit — Cmd+Q, menu Quit, Dock Quit, NSApp.terminate — arrives
+    /// here. The dialog is a sheet on the browser window (non-blocking for
+    /// the rest of the app); confirming replies true so the normal terminate
+    /// path (applicationWillTerminate -> flush) still runs, cancelling
+    /// replies false with no side effects.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if QuitConfirmation.bypassOnce {
+            QuitConfirmation.bypassOnce = false
+            return .terminateNow
+        }
+        if QuitConfirmation.confirmed { return .terminateNow }
+        if QuitConfirmation.asking { return .terminateCancel }
+        guard let window = NSApp.mainWindow ?? NSApp.windows.first(where: { $0.contentView != nil && $0.isVisible }) else {
+            let answer = QuitConfirmation.alert().runModal()
+            if answer == .alertFirstButtonReturn {
+                QuitConfirmation.confirmed = true
+                return .terminateNow
+            }
+            return .terminateCancel
+        }
+        QuitConfirmation.asking = true
+        QuitConfirmation.alert().beginSheetModal(for: window) { answer in
+            QuitConfirmation.asking = false
+            if answer == .alertFirstButtonReturn {
+                QuitConfirmation.confirmed = true
+                sender.reply(toApplicationShouldTerminate: true)
+            } else {
+                sender.reply(toApplicationShouldTerminate: false)
+            }
+        }
+        return .terminateLater
     }
 
     /// The nearest thing to a crash reporter a browser with no server can
@@ -158,10 +212,12 @@ final class Links: NSObject, NSApplicationDelegate {
     /// browser, that already knows what build this is. The person still
     /// reads it and presses send themselves — nothing here sends anything.
     static func writeFeedback() {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
         var text = URLComponents(string: "https://github.com/tretten/satori/issues/new")!
         text.queryItems = [
-            URLQueryItem(name: "title", value: "Satori feedback — \(Updater.version) (\(Updater.build))"),
-            URLQueryItem(name: "body", value: "\n\n—\nSatori \(Updater.version), build \(Updater.build), macOS \(ProcessInfo.processInfo.operatingSystemVersionString)"),
+            URLQueryItem(name: "title", value: "Satori feedback, \(version) (\(build))"),
+            URLQueryItem(name: "body", value: "\n\nSatori \(version), build \(build), macOS \(ProcessInfo.processInfo.operatingSystemVersionString)"),
         ]
         guard let url = text.url else { return }
         NSWorkspace.shared.open(url)

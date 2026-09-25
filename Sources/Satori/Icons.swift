@@ -254,6 +254,9 @@ struct Mark: View {
     let letter: String
     var size: CGFloat = 16
     var dim = false
+    /// Website tint behind the tab: only the fallback letter follows it.
+    /// Favicon bitmaps are never recolored.
+    var tint: Tint? = nil
 
     var body: some View {
         Group {
@@ -266,11 +269,11 @@ struct Mark: View {
             } else {
                 Text(letter)
                     .font(.system(size: size * 0.56, weight: .medium))
-                    .foregroundStyle(Palette.muted)
+                    .foregroundStyle(tint != nil ? Palette.foreground(on: tint, dimmed: true) : Palette.muted)
                     .frame(width: size, height: size)
                     .background(
                         RoundedRectangle(cornerRadius: size * 0.22, style: .continuous)
-                            .fill(Palette.ink.opacity(0.06))
+                            .fill(tint != nil ? Palette.foreground(on: tint).opacity(0.14) : Palette.ink.opacity(0.06))
                     )
             }
         }

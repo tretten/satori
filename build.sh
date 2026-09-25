@@ -5,32 +5,36 @@
 #
 #   ./build.sh                 debug-free release build, ad-hoc signed: runs here
 #   ./build.sh release dmg     + build/Satori.dmg, build/Satori.zip and
-#                                build/appcast.json, signed with Developer ID
+#                                build/appcast.xml, signed with Developer ID
 #                                if there is one in the keychain
 #   ./build.sh release ship    + both notarised, the DMG stapled
 #
 # Same shape as the one next door: SwiftPM builds the executable, and a macOS
-# app bundle is just a folder with a plist and the binary in the right place.
+# app bundle is just a folder with a plist and the binary in the right place —
+# plus the Sparkle framework it updates through, embedded in
+# Contents/Frameworks.
 #
-# The three files keep the same names from release to release, so the site
-# links to them once and the updater reads one address forever. ./publish.sh
-# copies them into the site.
+# Updates ride Sparkle 2 (a SwiftPM dependency): build.sh embeds its framework
+# and signs it inside-out, and writes the versioned DMG/ZIP plus a signed
+# Sparkle appcast.xml that GitHub serves as a release asset. The appcast the
+# app reads lives at one address forever (SUFeedURL, below); ./publish.sh
+# copies the three constant-named files into the site.
 #
 # "dmg" lays the disk image's window out with dmgbuild, installed into .build
 # on first use (Python 3 and a network, once).
 #
-# What "ship" needs, once:
+# What "dmg"/"ship" needs, once (details in docs/SIGNING.md):
 #   - a Developer ID Application certificate in the login keychain
 #     (SATORI_SIGN_IDENTITY names it; otherwise the first one found is used)
 #   - a notarytool profile: xcrun notarytool store-credentials "satori"
 #     (SATORI_NOTARY_PROFILE names it; default "satori")
-#   - SATORI_DOWNLOAD_URL, the https folder the three files are served from,
-#     for the appcast. Default https://github.com/tretten/satori/releases/latest/download, which is
-#     where Updater.feed in Updater.swift looks.
+#   - the Sparkle EdDSA private key in the login keychain, account "satori"
+#     (SATORI_SPARKLE_ACCOUNT names it; made once with generate_keys)
+#   - the enclosure address is fixed: tretten/satori release v<VERSION> assets
 #
-# NOTES.md, next to this script, is what's new: newest release first, one
-# paragraph each. The first paragraph goes into the appcast, and from there
-# under the version line in Settings.
+# NOTES.md, next to this script, is what's new: one `## <version>` section per
+# release, newest first. The section for this version goes into the appcast,
+# and from there into Sparkle's update window.
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -38,20 +42,42 @@ CONFIG="${1:-release}"
 STEP="${2:-app}"
 APP="build/Satori.app"
 NAME="Satori"
+# The single source for the marketing version. The build number Sparkle
+# compares is derived from it — MINOR*100+PATCH, e.g. 0.8.0 → 800 — so the
+# two never drift apart. Monotonic while the major stays 0 and PATCH < 100;
+# anything else fails loudly below instead of silently shipping a build
+# number Sparkle would ignore.
 VERSION="$(tr -d '[:space:]' < VERSION)"
-# A build number that only ever goes up, so the updater can tell newer from
-# older without parsing version strings.
-BUILD="$(date +%Y%m%d%H%M)"
+BUILD="$(python3 -c 'import sys; _, minor, patch = sys.argv[1].split("."); print(int(minor) * 100 + int(patch))' "$VERSION")"
+PATCH="$(python3 -c 'import sys; print(sys.argv[1].split(".")[2])' "$VERSION")"
+[ "$PATCH" -lt 100 ] || { echo "PATCH must stay below 100 for the Sparkle build number" >&2; exit 1; }
 # The oldest macOS this runs on — in the plist, and in the appcast so an
 # older Mac is not handed a build it can't open.
 MINIMUM="14.0"
+# Where the app looks for updates, forever: the Sparkle RSS feed served as a
+# GitHub release asset.
+FEED="https://github.com/tretten/satori/releases/latest/download/appcast.xml"
+# The public half of the Sparkle EdDSA keypair. Public on purpose — kuu keeps
+# its own the same way in its Info.plist; the private half stays in the login
+# keychain and never appears here.
+SUPUBLIC="${SATORI_SPARKLE_PUBLIC_KEY:-a4ERoWdVOkoS1y5JY254w19tGP0ZdK5zzhgVhuB95ZM=}"
 
 swift build -c "$CONFIG"
 BINARY=".build/$CONFIG/Satori"
 
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 cp "$BINARY" "$APP/Contents/MacOS/$NAME"
+
+# Sparkle rides inside the bundle: the XCFramework SwiftPM fetched doubles as
+# the embedded copy. The binary links Sparkle as @rpath, and the bundle's
+# Frameworks folder is not on its search path — so it is added, once, here.
+# (install_name_tool before any signing below; signing seals the result.)
+SPARKLE_FW="$(echo .build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework)"
+[ -d "$SPARKLE_FW" ] || { echo "Sparkle.framework not found — run 'swift package resolve' first" >&2; exit 1; }
+cp -R "$SPARKLE_FW" "$APP/Contents/Frameworks/Sparkle.framework"
+chmod -R u+w "$APP/Contents/Frameworks/Sparkle.framework"
+install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP/Contents/MacOS/$NAME" 2>/dev/null || true
 
 # Symbols stay out of the app. The linker leaves every function's name and a
 # map back to the source in the binary — 15,000 entries, more than half of
@@ -130,14 +156,20 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <string>Websites you visit can ask to use your microphone. Satori asks you first, every time, for each site.</string>
   <key>NSDownloadsFolderUsageDescription</key>
   <string>Files you download are saved to your Downloads folder.</string>
+  <!-- Sparkle 2: where updates come from, how often they are looked for, and
+       the public key the downloaded build is checked against. -->
+  <key>SUFeedURL</key><string>$FEED</string>
+  <key>SUEnableAutomaticChecks</key><true/>
+  <key>SUScheduledCheckInterval</key><integer>86400</integer>
+  <key>SUAutomaticallyUpdate</key><true/>
+  <key>SUPublicEDKey</key><string>$SUPUBLIC</string>
 </dict>
 </plist>
 PLIST
 
 # Signing. A Developer ID certificate, when there is one, with the hardened
 # runtime Gatekeeper insists on for anything notarised; otherwise ad-hoc,
-# which is enough for the app to run on the machine that built it — and
-# which the updater refuses to swap anything in under.
+# which is enough for the app to run on the machine that built it.
 IDENTITY="${SATORI_SIGN_IDENTITY:-$(security find-identity -v -p codesigning 2>/dev/null \
   | grep -o '"Developer ID Application: [^"]*"' | head -1 | tr -d '"' || true)}"
 # Passkeys need an entitlement Apple grants to browsers on request, and a
@@ -150,18 +182,49 @@ if [ -f "Satori.provisionprofile" ]; then
   ENTITLEMENTS="Satori.passkeys.entitlements"
   echo "passkeys: profile embedded"
 fi
+# Nested code signs inside-out, towards the app bundle — codesign --deep is
+# never used, it can break the nested XPC seals. The Sparkle XPC services and
+# helpers first, then the framework, then the app itself.
+FW="$APP/Contents/Frameworks/Sparkle.framework"
+if [ -d "$FW" ]; then
+  FWV="$(readlink "$FW/Versions/Current")"
+  B="$FW/Versions/$FWV"
+  if [ -n "$IDENTITY" ]; then
+    NESTED=(codesign --force --options runtime --timestamp --sign "$IDENTITY")
+  else
+    NESTED=(codesign --force --sign -)
+  fi
+  for NEST in \
+    "$B/XPCServices/Downloader.xpc" \
+    "$B/XPCServices/Installer.xpc" \
+    "$B/Autoupdate" \
+    "$B/Updater.app"; do
+    [ -e "$NEST" ] && "${NESTED[@]}" "$NEST"
+  done
+  "${NESTED[@]}" "$FW"
+fi
 if [ -n "$IDENTITY" ]; then
-  codesign --force --deep --timestamp --options runtime \
+  codesign --force --timestamp --options runtime \
     --entitlements "$ENTITLEMENTS" \
     --sign "$IDENTITY" "$APP"
   echo "signed as: $IDENTITY"
 else
-  codesign --force --deep --sign - "$APP" 2>/dev/null || true
+  codesign --force --sign - "$APP" 2>/dev/null || true
   [ "$STEP" != "app" ] && echo "no Developer ID certificate found — the DMG will only open on this Mac" >&2
 fi
+codesign --verify --deep --strict "$APP" && echo "signature verified"
 
 echo "built: $APP ($VERSION, build $BUILD)"
 [ "$STEP" = "app" ] && exit 0
+
+# Versioned archives for the GitHub release plus constant-named copies for
+# the site: .../releases/download/v<VERSION>/Satori-<VERSION>.zip is the
+# Sparkle enclosure (a fixed address per release); .../latest/download/ serves
+# the same bytes under names that never change.
+DMG_VER="build/$NAME-$VERSION.dmg"
+ZIP_VER="build/$NAME-$VERSION.zip"
+DMG="build/$NAME.dmg"
+ZIP="build/$NAME.zip"
 
 # The disk image: the app beside a shortcut to Applications, on a white
 # window with an arrow between them — drawn by Installer/background.swift and
@@ -169,9 +232,8 @@ echo "built: $APP ($VERSION, build $BUILD)"
 # layout file itself, so no Finder is scripted and no window opens mid-build.
 # dmgbuild is installed into .build the first time, and needs Python 3 and a
 # network then; without it the image is the plain one it always was.
-DMG="build/$NAME.dmg"
 ART="build/installer"
-rm -rf "$ART" "$DMG"
+rm -rf "$ART" "$DMG_VER" "$DMG"
 DMGBUILD=".build/dmgbuild/bin/dmgbuild"
 if [ ! -x "$DMGBUILD" ]; then
   { python3 -m venv .build/dmgbuild && .build/dmgbuild/bin/pip install --quiet "dmgbuild==1.6.7"; } >/dev/null 2>&1 || true
@@ -182,7 +244,7 @@ if [ -x "$DMGBUILD" ] \
 then
   "$DMGBUILD" -s Installer/dmg.py \
     -D app="$APP" -D background="$ART/background.tiff" -D icon="$APP/Contents/Resources/AppIcon.icns" \
-    "$NAME" "$DMG" >/dev/null
+    "$NAME" "$DMG_VER" >/dev/null
 else
   echo "note: no dmgbuild — a plain disk image, without its window laid out" >&2
   STAGE="build/dmg"
@@ -190,50 +252,72 @@ else
   mkdir -p "$STAGE"
   cp -R "$APP" "$STAGE/"
   ln -s /Applications "$STAGE/Applications"
-  hdiutil create -volname "$NAME" -srcfolder "$STAGE" -ov -format UDZO -quiet "$DMG"
+  hdiutil create -volname "$NAME" -srcfolder "$STAGE" -ov -format UDZO -quiet "$DMG_VER"
   rm -rf "$STAGE"
 fi
 rm -rf "$ART"
-[ -n "$IDENTITY" ] && codesign --force --timestamp --sign "$IDENTITY" "$DMG"
-echo "packed: $DMG"
+[ -n "$IDENTITY" ] && codesign --force --timestamp --sign "$IDENTITY" "$DMG_VER"
+cp "$DMG_VER" "$DMG"
+echo "packed: $DMG_VER"
 
-# The ZIP is what the updater fetches, and its hash is what the updater
-# checks before opening it.
-ZIP="build/$NAME.zip"
-rm -f "$ZIP"
-ditto -c -k --keepParent "$APP" "$ZIP"
-SHA="$(shasum -a 256 "$ZIP" | cut -d' ' -f1)"
-echo "packed: $ZIP"
-
-# What the updater reads. The first paragraph of NOTES.md, with the two
-# characters JSON minds escaped, is the line under the version in Settings.
-BASE="${SATORI_DOWNLOAD_URL:-https://github.com/tretten/satori/releases/latest/download}"
-BASE="${BASE%/}"
-NOTES=""
-if [ -f NOTES.md ]; then
-  NOTES="$(awk 'NF { printf "%s%s", (n++ ? " " : ""), $0; next } n { exit }' NOTES.md \
-    | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
+[ "$STEP" = "dmg" ] && NOTARISE=0 || NOTARISE=1
+if [ "$NOTARISE" = "1" ]; then
+  # Notarisation: Apple looks both over. The ticket is stapled to the image
+  # and to the app, so the DMG opens on a Mac that has never seen it even
+  # offline — and the ZIP below carries the stapled app, which is what lets
+  # Sparkle install it without a Gatekeeper complaint.
+  [ -z "$IDENTITY" ] && { echo "can't ship without a Developer ID certificate" >&2; exit 1; }
+  xcrun notarytool submit "$DMG_VER" --keychain-profile "${SATORI_NOTARY_PROFILE:-satori}" --wait
+  xcrun stapler staple "$DMG_VER"
+  cp "$DMG_VER" "$DMG"
+  xcrun stapler staple "$APP"
+  xcrun stapler validate "$APP" >/dev/null && echo "staple verified"
 fi
-cat > build/appcast.json <<JSON
-{
-  "version": "$VERSION",
-  "build": $BUILD,
-  "url": "$BASE/$NAME.zip",
-  "dmg": "$BASE/$NAME.dmg",
-  "sha256": "$SHA",
-  "notes": "$NOTES",
-  "minimumSystemVersion": "$MINIMUM"
-}
-JSON
-echo "wrote: build/appcast.json ($VERSION, build $BUILD)"
-[ "$STEP" = "dmg" ] && exit 0
 
-# Notarisation: Apple looks both over. The ticket is stapled to the image,
-# so it opens on a Mac that has never seen this app and is offline; the ZIP
-# is fetched by an app that already trusts it, and is left as hashed.
-[ -z "$IDENTITY" ] && { echo "can't ship without a Developer ID certificate" >&2; exit 1; }
-for FILE in "$DMG" "$ZIP"; do
-  xcrun notarytool submit "$FILE" --keychain-profile "${SATORI_NOTARY_PROFILE:-search}" --wait
-done
-xcrun stapler staple "$DMG"
-echo "shipped: $DMG, $ZIP and build/appcast.json — ./publish.sh <folder> puts them on the site"
+# The ZIP is what Sparkle fetches — ditto'd from the app as it will ship, so
+# a `ship` run carries the stapled ticket inside.
+rm -f "$ZIP_VER" "$ZIP"
+ditto -c -k --keepParent "$APP" "$ZIP_VER"
+cp "$ZIP_VER" "$ZIP"
+echo "packed: $ZIP_VER"
+
+# What Sparkle reads: an RSS feed with one item per release, each carrying
+# the marketing version (shortVersionString), the integer build Sparkle
+# compares (sparkle:version), the oldest macOS it runs on
+# (minimumSystemVersion), the enclosure, and the EdDSA signature over the
+# archive (sparkle:edSignature). Built by Sparkle's own generate_appcast from
+# an isolated staging folder — it would otherwise pick up the DMG as a
+# second update — then verified with sign_update before it goes anywhere.
+SPARKLE_BIN="$(dirname "$(find .build/artifacts -name generate_appcast -type f 2>/dev/null | head -1)")"
+[ -x "$SPARKLE_BIN/generate_appcast" ] || { echo "Sparkle tools not found — run 'swift package resolve' first" >&2; exit 1; }
+SPARKLE_ACCOUNT="${SATORI_SPARKLE_ACCOUNT:-satori}"
+APPCAST_STAGE="$(mktemp -d)"
+cp "$ZIP_VER" "$APPCAST_STAGE/"
+NOTES_HTML=""
+if [ -f NOTES.md ]; then
+  NOTES_MD="$(awk -v v="$VERSION" '$0 ~ ("^## " v "( |$)"){f=1;next} /^## /{f=0} f' NOTES.md)"
+  [ -n "$NOTES_MD" ] || NOTES_MD="- Improvements and fixes"
+  NOTES_HTML="$(printf '%s\n' "$NOTES_MD" \
+    | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' \
+    | awk '
+        BEGIN{print "<ul>"; buf=""}
+        /^[[:space:]]*[-*][[:space:]]+/{
+          if (buf != "") print "<li>"buf"</li>"
+          line=$0; sub(/^[[:space:]]*[-*][[:space:]]+/,"",line); buf=line; next
+        }
+        /^[[:space:]]*$/{ next }
+        { l=$0; sub(/^[[:space:]]+/,"",l); buf = (buf=="") ? l : buf" "l }
+        END{ if (buf != "") print "<li>"buf"</li>"; print "</ul>" }
+      ')"
+  printf '<h2>Satori %s</h2>\n%s\n' "$VERSION" "$NOTES_HTML" > "$APPCAST_STAGE/$NAME-$VERSION.html"
+fi
+"$SPARKLE_BIN/generate_appcast" \
+  --account "$SPARKLE_ACCOUNT" \
+  --download-url-prefix "https://github.com/tretten/satori/releases/download/v$VERSION/" \
+  "$APPCAST_STAGE" >/dev/null
+cp "$APPCAST_STAGE/appcast.xml" build/appcast.xml
+rm -rf "$APPCAST_STAGE"
+"$SPARKLE_BIN/sign_update" --verify build/appcast.xml \
+  && echo "appcast verified"
+echo "wrote: build/appcast.xml ($VERSION, build $BUILD)"
+echo "shipped: $DMG_VER, $ZIP_VER and build/appcast.xml — attach the versioned files and appcast.xml to the GitHub release"

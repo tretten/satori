@@ -1,0 +1,51 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode
+        run: |
+          for app in \
+            /Applications/Xcode_26.6.app \
+            /Applications/Xcode_26.5.app \
+            /Applications/Xcode_26.4.1.app \
+            /Applications/Xcode.app
+          do
+            if [ -d "$app" ]; then
+              sudo xcode-select -s "$app"
+              break
+            fi
+          done
+          xcodebuild -version
+
+      # Builds only (there is no test suite yet). Releases are assembled
+      # locally by build.sh (Developer ID sign + notarytool + Sparkle
+      # appcast) and published by script/release.sh --publish —
+      # see docs/SIGNING.md. Nothing here signs, notarizes, publishes, or
+      # needs signing secrets (the release scripts below run syntax and
+      # --help/--dry-run checks only, no network, no mutations).
+      - name: Build
+        run: |
+          swift build
+
+      - name: Check release scripts
+        run: |
+          bash -n build.sh
+          bash -n publish.sh
+          bash -n script/lib-version.sh
+          bash -n script/bump.sh
+          bash -n script/release.sh
+          script/bump.sh --help >/dev/null
+          script/release.sh --help >/dev/null
+          script/release.sh --publish --dry-run >/dev/null
+          script/bump.sh 0.0.0 --dry-run >/dev/null 2>&1 && exit 1 || true

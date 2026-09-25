@@ -18,6 +18,7 @@ struct TabBar: View {
     @State private var plussed = false
     /// How wide the doors at the far end are, extension buttons included.
     @State private var doors: CGFloat = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         // A GeometryReader is only here to measure the width. Its content is
@@ -28,17 +29,22 @@ struct TabBar: View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
                 // The empty half of the strip is what you grab to move the
-                // window; the tabs keep the run they sit on.
-                DragStrip(reserved: Metrics.lights + Metrics.helm + Metrics.tabGap + run(in: geo.size.width) + Metrics.tabGap + Metrics.plusWidth, trailing: 26 + 24)
+                // window; the tabs keep the run they sit on. Explicit full-size
+                // frames: without one the representable's size is ambiguous and
+                // empty-area drags would fall back to the title bar (disabled
+                // in dress(_:) so tab drags can't move the window).
+                // A click on it takes the page back to its top.
+                DragStrip(reserved: Metrics.lights + Metrics.helm + Metrics.tabGap + run(in: geo.size.width) + Metrics.tabGap + Metrics.plusWidth, trailing: 26 + 24, onClick: { browser.active?.scrollToTop() })
+                    .frame(width: geo.size.width, height: Metrics.strip)
                 // And the corner the lights sit in, which is title bar too —
                 // the one stretch left to take hold of when tabs fill the row.
-                DragStrip()
-                    .frame(width: Metrics.lights)
+                DragStrip(onClick: { browser.active?.scrollToTop() })
+                    .frame(width: Metrics.lights, height: Metrics.strip)
 
                 HStack(spacing: Metrics.tabGap) {
-                    // Back, forward, reload, first thing after the lights —
+                    // Back, forward, first thing after the lights —
                     // where hands coming from every other browser look for them.
-                    Helm(browser: browser)
+                    Helm(browser: browser, tint: browser.themeColor)
                         .padding(.trailing, 8)
 
                     // The tabs, in a run of their own. While they fit, it is
@@ -71,7 +77,7 @@ struct TabBar: View {
                                     .offset(x: held ? travel - CGFloat(index - from) * step : 0)
                                     .zIndex(held ? 1 : 0)
                                     .shadow(color: .black.opacity(held ? 0.14 : 0), radius: 12, y: 4)
-                                    .gesture(reorder(tab: tab, index: index, step: step))
+                                    .highPriorityGesture(reorder(tab: tab, index: index, step: step))
                                     .id(tab.id)
                                 }
                             }
@@ -80,8 +86,8 @@ struct TabBar: View {
                         .scrollDisabled(!overflowing(in: geo.size.width))
                         .frame(width: run(in: geo.size.width))
                         .onAppear { reveal(reader, in: geo.size.width) }
-                        .onChange(of: overflowing(in: geo.size.width)) { _, _ in reveal(reader, in: geo.size.width) }
-                        .onChange(of: browser.activeID) { _, _ in reveal(reader, in: geo.size.width, gliding: true) }
+                        .onChange(of: overflowing(in: geo.size.width)) { _, _ in revealSoon(reader, in: geo.size.width) }
+                        .onChange(of: browser.activeID) { _, _ in revealSoon(reader, in: geo.size.width, gliding: true) }
                     }
 
                     // The way to a new page, right after the tabs rather than
@@ -90,14 +96,14 @@ struct TabBar: View {
                     Button { browser.newTab() } label: {
                         Image(systemName: "plus")
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(Palette.muted)
+                            .foregroundStyle(Palette.foreground(on: browser.themeColor, dimmed: true))
                             .frame(width: 15, height: 15)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 6)
                             .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                             .background(
                                 RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                    .fill(plussed ? Palette.hover : .clear)
+                                    .fill(plussed ? (browser.themeColor != nil ? Palette.foreground(on: browser.themeColor).opacity(0.12) : Palette.hover) : .clear)
                             )
                     }
                     .buttonStyle(.plain)
@@ -113,16 +119,20 @@ struct TabBar: View {
                     // The extensions, the bookmarks and the settings, at the
                     // far end of the row. The dropdown hangs from the star.
                     HStack(spacing: Metrics.tabGap) {
-                        ExtensionSlot()
+                        ExtensionSlot(tint: browser.themeColor)
+                            // Icons decode in Extensions.buttons when the row re-evaluates.
+                            // Kept out of the insertion transaction so `+` never waits on them.
+                            .transaction { $0.animation = nil }
                         // There from the first file on, while the list is
                         // worth opening. Filled while one is still coming.
                         if !browser.downloading.isEmpty || !browser.loot.kept.isEmpty {
                             Door(
                                 icon: browser.downloading.isEmpty ? "arrow.down.circle" : "arrow.down.circle.fill",
-                                help: "Downloads   ⇧⌘J"
+                                help: "Downloads   ⇧⌘J",
+                                tint: browser.themeColor
                             ) { browser.hoarding.toggle() }
                         }
-                        Door(icon: "command", help: "Settings   ⌘,") { browser.tuning.toggle() }
+                        Door(icon: "command", help: "Settings   ⌘,", tint: browser.themeColor) { browser.tuning.toggle() }
                     }
                     .background {
                         GeometryReader { box in
@@ -149,17 +159,43 @@ struct TabBar: View {
             browser.take(providers)
         }
         .background(landing ? Palette.hover : .clear)
-        // Worn in the page's own colour, so the strip reads as the page
-        // continuing upward.
-        .background(browser.themeColor ?? Palette.ground)
+        // Strip ground, gated on tint only: tinted wears the page's own
+        // opaque colour so the strip reads as the page continuing upward;
+        // untinted (Adaptive OFF / no page colour) is near-opaque ground
+        // (Palette.ground at 0.95: effectively no blur, only faint
+        // show-through) so the strip reads separated with a hint of depth.
+        // Palette.ground follows light/dark automatically; near-opaque is
+        // already fine under Reduce Transparency -- no extra handling here.
+        .background {
+            if let tint = browser.themeColor {
+                tint.color
+            } else {
+                Rectangle().fill(Palette.ground.opacity(0.95))
+            }
+        }
+        // Hairline only when untinted: on a tint it would cut the
+        // page-continuing illusion; on the material it separates chrome
+        // from content (Side.swift:88-90).
+        .overlay(alignment: .bottom) {
+            if browser.themeColor == nil {
+                Rectangle().fill(Palette.hairline).frame(height: 1)
+                    .allowsHitTesting(false)
+            }
+        }
+        .overlay(alignment: .bottom) {
+            StripProgress(browser: browser)
+                .allowsHitTesting(false)
+        }
         .animation(Motion.quick, value: landing)
-        .animation(Motion.settle, value: browser.activeID)
+        // No slide for the transaction that activates a just-inserted tab:
+        // the old pill sliding while the new pill transitions in is the
+        // double-pill ghost. Switching, reorder and the rest still glide.
+        .animation(browser.insertedID == nil ? Motion.settle : nil, value: browser.activeID)
         .animation(Motion.quick, value: browser.themeColor)
-        // The row makes room for the field on the same spring as everything
-        // else. Without this the widths changed between one frame and the next
-        // and the tabs appeared to jump aside.
-        .animation(Motion.settle, value: browser.editingTab)
-        .animation(Motion.settle, value: browser.tabs.map(\.id))
+        // No animation on tab-list identity: it pulled every pill, the helm,
+        // the plus and the extension icons into one spring on each insertion,
+        // which froze `+`. Arrival still reads via the pill transition and
+        // the live-pill slide (activeID above); reorder animates explicitly.
     }
 
     /// Pick a tab up and the others get out of its way as it passes them.
@@ -186,13 +222,29 @@ struct TabBar: View {
             }
     }
 
+    /// The reveal, sequenced past a `+` insertion: scrolling on the strip's
+    /// spring in the same transaction as the new pill's appear transition
+    /// fights it and reads as a stutter. Insertions glide once settled;
+    /// switches glide at once. Reduce Motion never glides (see `reveal`).
+    private func revealSoon(_ reader: ScrollViewProxy, in strip: CGFloat, gliding: Bool = false) {
+        guard browser.insertedID == nil else {
+            let id = browser.activeID
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                guard browser.activeID == id else { return }
+                reveal(reader, in: strip, gliding: true)
+            }
+            return
+        }
+        reveal(reader, in: strip, gliding: gliding)
+    }
+
     /// Brings the tab you are on into view once the run scrolls: at once
     /// when the window first shows it, on the strip's spring when you pick
     /// another. A turn of the run loop later, so the run has been laid out.
     private func reveal(_ reader: ScrollViewProxy, in strip: CGFloat, gliding: Bool = false) {
         guard overflowing(in: strip), let id = browser.activeID else { return }
         DispatchQueue.main.async {
-            if gliding {
+            if gliding, !reduceMotion {
                 withAnimation(Motion.settle) { reader.scrollTo(id) }
             } else {
                 reader.scrollTo(id)
@@ -210,18 +262,13 @@ struct TabBar: View {
         content(in: strip) > room(in: strip) + 0.5
     }
 
-    /// Everything in the run at the width the tabs get — and the address
-    /// field's width for a tab being edited, which grows to take it.
+    /// Everything in the run at the width the tabs get.
     private func content(in strip: CGFloat) -> CGFloat {
         let each = width(in: strip)
         let pinned = CGFloat(browser.pinnedCount)
         let loose = CGFloat(browser.tabs.count) - pinned
-        var total = pinned * Metrics.pinWidth + loose * each
+        return pinned * Metrics.pinWidth + loose * each
             + CGFloat(max(0, browser.tabs.count - 1)) * Metrics.tabGap
-        if let id = browser.editingTab, let tab = browser.tabs.first(where: { $0.id == id }) {
-            total += min(340, strip - Metrics.lights - 12) - (tab.pin != nil ? Metrics.pinWidth : each)
-        }
-        return total
     }
 
     /// The strip, less the lights, the plus, the doors at the far end and
@@ -247,22 +294,69 @@ struct TabBar: View {
     }
 }
 
-/// Reload, back, forward. They watch the live tab, not the window: whether
-/// there is anywhere to go back to is the tab's to say, and it changes with
-/// every page. Used here and, beside the traffic lights instead of at the
-/// far end of the row, in the sidebar.
-struct Helm: View {
+/// Page-load progress: a thin bar along the strip's bottom edge, width
+/// proportional to the active tab's load progress, in the system accent
+/// colour. Outside the tint foreground system on purpose — never
+/// Palette.foreground, never a tint ground.
+///
+/// Shown while the active tab is loading; hidden once progress reaches 1 or
+/// loading ends. The outer view follows tab switches (browser.activeID); the
+/// inner view follows that tab's loading/progress, so a switch from a loading
+/// tab to an idle one hides at once and a fast load that finished before the
+/// next render never appears (no flicker, no stuck bar).
+private struct StripProgress: View {
     @ObservedObject var browser: Browser
 
     var body: some View {
         if let tab = browser.active {
-            Wheel(browser: browser, tab: tab)
+            StripProgressInner(tab: tab)
+        } else {
+            Color.clear.frame(height: 2)
+        }
+    }
+}
+
+private struct StripProgressInner: View {
+    @ObservedObject var tab: Tab
+
+    var body: some View {
+        GeometryReader { geo in
+            if tab.loading && tab.progress < 1 {
+                Rectangle()
+                    .fill(Color(nsColor: .controlAccentColor))
+                    .opacity(0.65)
+                    .shadow(color: Color(nsColor: .controlAccentColor).opacity(0.5), radius: 4, y: 0)
+                    .frame(width: geo.size.width * min(max(tab.progress, 0), 1), height: 2)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            } else {
+                Color.clear
+            }
+        }
+        .frame(height: 2)
+        .allowsHitTesting(false)
+    }
+}
+
+/// Back, forward. They watch the live tab, not the window: whether
+/// there is anywhere to go back to is the tab's to say, and it changes with
+/// every page. Used here and, beside the traffic lights instead of at the
+/// far end of the row, in the sidebar. Reload/stop lives in the live tab
+/// pill on hover, with Cmd+R / Cmd+. through the existing action paths.
+struct Helm: View {
+    @ObservedObject var browser: Browser
+    /// Website tint behind the top bar. Nil keeps the existing Palette
+    /// doors; the sidebar uses the default.
+    var tint: Tint? = nil
+
+    var body: some View {
+        if let tab = browser.active {
+            Wheel(browser: browser, tab: tab, tint: tint)
         } else {
             // Nowhere to go: the doors stay in place, greyed, so the row
             // doesn't shift when a tab arrives.
             HStack(spacing: 2) {
-                Door(icon: "chevron.left") {}
-                Door(icon: "chevron.right") {}
+                Door(icon: "chevron.left", tint: tint) {}
+                Door(icon: "chevron.right", tint: tint) {}
             }
             .opacity(0.3)
             .allowsHitTesting(false)
@@ -272,30 +366,21 @@ struct Helm: View {
     private struct Wheel: View {
         let browser: Browser
         @ObservedObject var tab: Tab
+        var tint: Tint? = nil
 
         var body: some View {
             let back = !tab.isBlank && tab.canGoBack
             let forward = !tab.isBlank && tab.canGoForward
             HStack(spacing: 2) {
-                // Reload, back where it used to be — before back and forward —
-                // and a stop while the page is still on its way.
-                if tab.loading {
-                    Door(icon: "xmark", help: "Stop   ⌘.") { tab.stop() }
-                } else {
-                    Door(icon: "arrow.clockwise", help: "Reload   ⌘R") { tab.reload() }
-                        .disabled(tab.isBlank)
-                        .opacity(tab.isBlank ? 0.3 : 1)
-                }
-                Door(icon: "chevron.left", help: "Back   ⌘[") { browser.back() }
+                Door(icon: "chevron.left", help: "Back   ⌘[", tint: tint) { browser.back() }
                     .disabled(!back)
                     .opacity(back ? 1 : 0.3)
-                Door(icon: "chevron.right", help: "Forward   ⌘]") { browser.forward() }
+                Door(icon: "chevron.right", help: "Forward   ⌘]", tint: tint) { browser.forward() }
                     .disabled(!forward)
                     .opacity(forward ? 1 : 0.3)
             }
             .animation(Motion.quick, value: back)
             .animation(Motion.quick, value: forward)
-            .animation(Motion.quick, value: tab.loading)
         }
     }
 }
@@ -306,26 +391,26 @@ private struct TabPill: View {
     @ObservedObject var tab: Tab
     let live: Bool
     let width: CGFloat
-    /// How much of the strip there is, for the field that grows over it.
+    /// How much of the strip there is.
     let room: CGFloat
     let pill: Namespace.ID
     let close: () -> Void
 
     @State private var hovering = false
-    @State private var shake: CGFloat = 0
+    /// When the last single click landed, for telling a double-click apart
+    /// from two separate clicks without making a single click wait out the
+    /// system's double-click delay first (see the tap below).
+    @State private var lastTap = Date.distantPast
 
-    private var editing: Bool { browser.editingTab == tab.id }
-    private var pinned: Bool { tab.pin != nil && !editing }
+    private var pinned: Bool { tab.pin != nil }
     /// Too narrow for a title: the site's mark alone, the title in the
     /// tooltip, and ⌘W or the menu to close it — a cross on something this
     /// small would be what a click to pick the tab lands on.
-    private var compact: Bool { !editing && !pinned && width < Metrics.tabTitled }
+    private var compact: Bool { !pinned && width < Metrics.tabTitled }
 
-    /// A pinned tab is a square, an edited one is a field, everything else is
-    /// its share of what is left.
+    /// A pinned tab is a square, everything else is its share of what is left.
     private var span: CGFloat {
-        if editing { return min(340, room) }
-        return pinned ? Metrics.pinWidth : width
+        pinned ? Metrics.pinWidth : width
     }
 
     var body: some View {
@@ -334,6 +419,7 @@ private struct TabPill: View {
                 Group {
                     if browser.editingPin == tab.id {
                         PillField(browser: browser,
+                            tint: browser.themeColor,
                             font: .systemFont(ofSize: 12, weight: .medium), alignment: .center,
                             text: { tab.pin ?? "" },
                             change: { browser.letter($0, for: tab) },
@@ -350,7 +436,7 @@ private struct TabPill: View {
                             },
                             finish: { browser.endPinEdit() })
                     } else if prefs.glyph == .icons, let icon = tab.icon {
-                        Mark(icon: icon, letter: tab.pin ?? "", size: 16, dim: tab.asleep)
+                        Mark(icon: icon, letter: tab.pin ?? "", size: 16, dim: tab.asleep, tint: browser.themeColor)
                     } else {
                         Text(tab.pin ?? "")
                             .font(.system(size: 12, weight: .medium))
@@ -368,47 +454,33 @@ private struct TabPill: View {
             }
         }
         .background { ground }
-        .overlay {
-            // An open field gets a frame of its own, so the tab being typed
-            // in reads as the one thing on the row that wants the keyboard.
-            if editing {
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .strokeBorder(Palette.ink.opacity(0.3), lineWidth: 1)
-            }
-        }
-        .modifier(Shake(travel: shake))
         .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-        // Never both at once.
-        //
-        // A view carrying a single tap *and* a double tap has to wait out the
-        // system's double-click delay before it can conclude that a click was
-        // single — and that delay is a preference, adjustable up to a second.
-        // Which is exactly how long a tab took to come forward.
-        //
-        // So each tab carries one gesture. The pinned square you are already
-        // on has nothing to do on a single click, so it takes the double one
-        // and edits its letter; everything else answers the first click at
-        // once. Change Letter in the menu covers the rest.
-        .modifier(OneClick(double: live && pinned) {
-            if live && pinned {
+        // One tap gesture only, so picking a tab never waits out the system's
+        // double-click delay. A click on the tab already showing raises the
+        // centred address field; on any other, it picks the tab. Scrolling to
+        // the top lives on the empty strip. A pinned square's double-click
+        // (see `lastTap`) still edits its letter, taking the field back down.
+        .onTapGesture {
+            let now = Date()
+            let double = now.timeIntervalSince(lastTap) < 0.4
+            lastTap = now
+            if double && pinned {
+                browser.dismiss()
                 browser.editLetter(tab)
-            } else if live && !pinned {
-                browser.beginTabEdit(tab)
+                return
+            }
+            if live {
+                browser.edit()
             } else {
                 browser.select(tab)
             }
-        })
+        }
         .onHover { hovering = $0 }
         .contextMenu { TabMenu(browser: browser, tab: tab, close: close) }
         .help(pinned || compact ? tab.label : "")
+        .accessibilityHint(live ? "Opens the address field." : "Shows this tab.")
         .animation(Motion.quick, value: hovering)
-        .animation(Motion.settle, value: editing)
         .animation(Motion.settle, value: tab.pin)
-        .onChange(of: browser.refusals) { _, _ in
-            guard editing else { return }
-            shake = 0
-            withAnimation(.easeOut(duration: 0.5)) { shake = 1 }
-        }
         // Arriving and leaving from the strip rather than from nowhere.
         .transition(.scale(scale: 0.9, anchor: .leading).combined(with: .opacity))
     }
@@ -418,9 +490,9 @@ private struct TabPill: View {
         if compact {
             ZStack {
                 if tab.loading {
-                    Ring()
+                    Ring(tint: browser.themeColor)
                 } else {
-                    Mark(icon: prefs.glyph == .icons ? tab.icon : nil, letter: tab.monogram, size: 15, dim: tab.asleep)
+                    Mark(icon: prefs.glyph == .icons ? tab.icon : nil, letter: tab.monogram, size: 15, dim: tab.asleep, tint: browser.themeColor)
                 }
             }
             .frame(width: 16, height: 16)
@@ -433,49 +505,19 @@ private struct TabPill: View {
 
     private var titled: some View {
         HStack(spacing: 6) {
-            if editing {
-                // The icon stays where it was — or a globe when the page has
-                // none yet — so the tab keeps its face while it takes an address.
-                if let icon = tab.icon {
-                    Mark(icon: icon, letter: tab.monogram, size: 15, dim: tab.asleep)
-                } else {
-                    Image(systemName: "globe")
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(Palette.muted)
-                        .frame(width: 15, height: 15)
-                }
-                PillField(browser: browser,
-                    text: { browser.tabDraft },
-                    change: { browser.tabDraft = $0 },
-                    command: {
-                        switch $0 {
-                        case #selector(NSResponder.insertNewline(_:)):
-                            // Returning true keeps the field editing, which is what lets a
-                            // refused address stay on screen instead of being thrown away.
-                            browser.commitTabEdit()
-                            return true
-                        case #selector(NSResponder.cancelOperation(_:)):
-                            browser.cancelTabEdit()
-                            return true
-                        default:
-                            return false
-                        }
-                    },
-                    finish: { browser.cancelTabEdit() })
-                    .frame(height: 16)
-            } else if hovering || (prefs.glyph == .icons && !tab.isBlank) {
+            if hovering || (prefs.glyph == .icons && !tab.isBlank) {
                 // The close lives where the mark was: the face swaps for
                 // a cross under the hand, and the tap swaps with it.
                 ZStack {
                     if hovering {
                         Image(systemName: "xmark")
                             .font(.system(size: 8, weight: .semibold))
-                            .foregroundStyle(Palette.muted)
+                            .foregroundStyle(muted)
                             .frame(width: 15, height: 15)
-                            .background(Palette.ink.opacity(0.07), in: Circle())
+                            .background(closePlate, in: Circle())
                             .transition(.opacity)
                     } else if prefs.glyph == .icons, !tab.isBlank {
-                        Mark(icon: tab.icon, letter: tab.monogram, size: 15)
+                        Mark(icon: tab.icon, letter: tab.monogram, size: 15, tint: browser.themeColor)
                     }
                 }
                 .frame(width: 15, height: 15)
@@ -508,16 +550,74 @@ private struct TabPill: View {
 
             Spacer(minLength: 2)
 
-            // Which tab the noise is coming from. ⌘⇧M stops it.
-            if tab.noisy {
-                Image(systemName: "speaker.wave.2.fill")
-                    .font(.system(size: 8))
-                    .foregroundStyle(Palette.muted)
-                    .frame(width: 15, height: 15)
+            HStack(spacing: 4) {
+                // Video pop-out, left of reload: the same Shift-Cmd-P path as
+                // Float Video. The live-plus-hover gate stays, and on top of
+                // it the icon only appears while floating would actually work
+                // (`canFloat`) or already is (`floating`, as the way back) —
+                // so tabs without a playing video never grow it on hover.
+                if live && (hovering || tab.floating) && (tab.floating || tab.canFloat) {
+                    Button { browser.toggleFloat() } label: {
+                        Image(systemName: tab.floating ? "pip.exit" : "pip.enter")
+                            .font(.system(size: 9.5, weight: .medium))
+                            .foregroundStyle(muted)
+                            .frame(width: 15, height: 15)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(tab.isBlank && !tab.floating)
+                    .opacity(tab.isBlank && !tab.floating ? 0.3 : 1)
+                    .help("Float Video   ⇧⌘P")
+                    .accessibilityLabel("Float Video")
+                    .transition(.opacity)
+                }
+                // Hover reload inside the live pill: a stop while the page
+                // is still on its way, a reload otherwise. Trailing,
+                // alongside the speaker — the close up front is untouched.
+                if live && hovering {
+                    Button {
+                        if tab.loading { tab.stop() } else { tab.reload() }
+                    } label: {
+                        Group {
+                            if tab.loading {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 8, weight: .semibold))
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.system(size: 9.5, weight: .medium))
+                            }
+                        }
+                        .foregroundStyle(muted)
+                        .frame(width: 15, height: 15)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(tab.isBlank && !tab.loading)
+                    .opacity(tab.isBlank && !tab.loading ? 0.3 : 1)
+                    .help(tab.loading ? "Stop   ⌘." : "Reload   ⌘R")
+                    .accessibilityLabel(tab.loading ? "Stop" : "Reload")
+                    .transition(.opacity)
+                }
+                // Which tab the noise is coming from. ⌘⇧M stops it.
+                if tab.noisy {
+                    Image(systemName: "speaker.wave.2.fill")
+                        .font(.system(size: 8))
+                        .foregroundStyle(muted)
+                        .frame(width: 15, height: 15)
+                }
             }
+            .animation(Motion.quick, value: hovering)
+            .animation(Motion.quick, value: tab.loading)
+            .animation(Motion.quick, value: tab.canFloat)
+            .animation(Motion.quick, value: tab.floating)
         }
+        // Reserve the row height a titled tab always needs, so a blank tab
+        // hovering from empty to "New Tab" changes only paint, never size:
+        // without this the idle HStack is just a Spacer and the pill grows
+        // taller on hover, which reads as it jumping up off the baseline.
+        .frame(minHeight: 16)
         .padding(.leading, 9)
-        .padding(.trailing, editing ? 11 : 7)
+        .padding(.trailing, 7)
         .padding(.vertical, 7)
         .frame(width: span, alignment: .leading)
     }
@@ -527,41 +627,87 @@ private struct TabPill: View {
         if live {
             // The grey fills from the left as you read down the page. It is
             // the one thing in the window that says how far in you are, and
-            // it says it without adding anything to the window.
-            ZStack(alignment: .leading) {
-                Rectangle().fill(Palette.wash)
-                // Not on a pinned square, nor a tab down to its mark. Thirty
-                // points of grey filling from the left behind a single letter
-                // says nothing about anything — it needs the width of a title
-                // to read as progress at all.
-                if !pinned && !compact {
-                    Rectangle()
-                        .fill(Palette.ink.opacity(0.055))
-                        .frame(width: span * tab.reading)
-                        .animation(.easeOut(duration: 0.15), value: tab.reading)
+            // it says it without adding anything to the window. On a tint
+            // the pill is the on-tint foreground laid over the bar, so the
+            // full-strength on-tint text sits on a ground of its own family
+            // instead of white on fixed light grey.
+            if browser.insertedID == tab.id {
+                // Just inserted by `+`: no slide. The matched pill gliding
+                // here while the new pill's own appear transition runs is
+                // the duplicated/offset ghost. A plain ground arrives with
+                // the pill itself; the matched pill takes over once settled
+                // (same frame, so the handover is invisible).
+                ZStack(alignment: .leading) {
+                    Rectangle().fill(liveGround)
+                    if !pinned && !compact {
+                        Rectangle()
+                            .fill(progressGround)
+                            .frame(width: span * tab.reading)
+                            .animation(.easeOut(duration: 0.15), value: tab.reading)
+                    }
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            } else {
+                ZStack(alignment: .leading) {
+                    Rectangle().fill(liveGround)
+                    // Not on a pinned square, nor a tab down to its mark. Thirty
+                    // points of grey filling from the left behind a single letter
+                    // says nothing about anything — it needs the width of a title
+                    // to read as progress at all.
+                    if !pinned && !compact {
+                        Rectangle()
+                            .fill(progressGround)
+                            .frame(width: span * tab.reading)
+                            .animation(.easeOut(duration: 0.15), value: tab.reading)
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .matchedGeometryEffect(id: "live", in: pill)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-            .matchedGeometryEffect(id: "live", in: pill)
         } else if hovering {
             RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .fill(Palette.hover)
+                .fill(hoverGround)
         } else if pinned {
             // A letter with nothing behind it reads as debris. A pinned tab
             // keeps a faint ground of its own so the block of them reads as
             // one thing.
             RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .fill(Palette.wash.opacity(0.55))
+                .fill(pinGround)
         }
     }
+
+    /// Opaque bar behind this pill; nil keeps every existing Palette ground.
+    private var tint: Tint? { browser.themeColor }
+    private var onTint: Color { Palette.foreground(on: tint) }
+    private var liveGround: Color {
+        guard tint != nil else { return Palette.wash }
+        return onTint.opacity(0.22)
+    }
+    private var hoverGround: Color {
+        guard tint != nil else { return Palette.hover }
+        return onTint.opacity(0.12)
+    }
+    private var pinGround: Color {
+        guard tint != nil else { return Palette.wash.opacity(0.55) }
+        return onTint.opacity(0.08)
+    }
+    private var progressGround: Color {
+        guard tint != nil else { return Palette.ink.opacity(0.055) }
+        return onTint.opacity(0.14)
+    }
+    private var closePlate: Color {
+        guard tint != nil else { return Palette.ink.opacity(0.07) }
+        return onTint.opacity(0.16)
+    }
+
 
     private var colour: Color {
         if live { return ink }
         return hovering ? ink.opacity(0.7) : muted
     }
 
-    private var ink: Color { Palette.ink }
-    private var muted: Color { Palette.muted }
+    private var ink: Color { Palette.foreground(on: browser.themeColor) }
+    private var muted: Color { Palette.foreground(on: browser.themeColor, dimmed: true) }
 }
 
 /// The address in a tab, the letter on a pin: one AppKit field for the two
@@ -571,6 +717,8 @@ private struct TabPill: View {
 /// different wiring.
 struct PillField: NSViewRepresentable {
     @ObservedObject var browser: Browser
+    /// Website tint behind the tab. Nil keeps the existing ink.
+    var tint: Tint? = nil
     var font: NSFont = .systemFont(ofSize: 12.5)
     var alignment: NSTextAlignment = .left
     var text: () -> String
@@ -588,7 +736,11 @@ struct PillField: NSViewRepresentable {
         field.focusRingType = .none
         field.alignment = alignment
         field.font = font
-        field.textColor = Palette.NS.ink
+        if let tint {
+            field.textColor = NSColor(Palette.foreground(on: tint))
+        } else {
+            field.textColor = Palette.NS.ink
+        }
         field.cell?.usesSingleLineMode = true
         field.cell?.wraps = false
         return field
@@ -605,15 +757,40 @@ struct PillField: NSViewRepresentable {
         if !coordinator.typing, field.stringValue != shown {
             field.stringValue = shown
         }
-        guard !coordinator.claimed else { return }
+        if let tint {
+            field.textColor = NSColor(Palette.foreground(on: tint))
+        } else {
+            field.textColor = Palette.NS.ink
+        }
+        guard !coordinator.claimed else {
+            if let editor = field.currentEditor() as? NSTextView {
+                if let tint {
+                    let fg = Palette.foreground(on: tint)
+                    editor.selectedTextAttributes = [
+                        .backgroundColor: NSColor(fg.opacity(0.22)),
+                        .foregroundColor: NSColor(fg),
+                    ]
+                }
+            }
+            return
+        }
         coordinator.claimed = true
+        let captured = tint
         DispatchQueue.main.async {
             field.window?.makeFirstResponder(field)
             guard let editor = field.currentEditor() as? NSTextView else { return }
-            editor.selectedTextAttributes = [
-                .backgroundColor: NSColor(Palette.ink.opacity(0.11)),
-                .foregroundColor: Palette.NS.ink,
-            ]
+            if let captured {
+                let fg = Palette.foreground(on: captured)
+                editor.selectedTextAttributes = [
+                    .backgroundColor: NSColor(fg.opacity(0.22)),
+                    .foregroundColor: NSColor(fg),
+                ]
+            } else {
+                editor.selectedTextAttributes = [
+                    .backgroundColor: NSColor(Palette.ink.opacity(0.11)),
+                    .foregroundColor: Palette.NS.ink,
+                ]
+            }
             editor.selectAll(nil)
         }
     }
@@ -702,6 +879,8 @@ struct OneClick: ViewModifier {
 /// enough to sit inside a tab without becoming the loudest thing in it.
 struct Ring: View {
     var size: CGFloat = 10
+    /// Website tint behind the tab. Nil keeps the existing grey.
+    var tint: Tint? = nil
     @State private var angle: Double = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -709,7 +888,7 @@ struct Ring: View {
         Circle()
             .trim(from: 0, to: 0.78)
             .stroke(
-                Palette.muted.opacity(0.7),
+                (tint != nil ? Palette.foreground(on: tint) : Palette.muted).opacity(0.7),
                 style: StrokeStyle(lineWidth: 1.4, lineCap: .round)
             )
             .frame(width: size, height: size)

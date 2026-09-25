@@ -3,6 +3,14 @@ import SwiftUI
 import WebKit
 import Combine
 
+// TODO(first-public-release): TEMPORARY — the whole Chrome extensions system
+// is hidden for the first public release. The code stays in tree and keeps
+// compiling; every user-reachable surface checks this flag. Previously
+// installed extensions stay on disk and are simply ignored, so flipping this
+// back to false re-enables everything. Re-enable by setting
+// EXTENSIONS_HIDDEN to false (then remove the placeholder branches it guards).
+let EXTENSIONS_HIDDEN = true
+
 // Chrome extensions, on WebKit.
 //
 // The engine is Apple's: WKWebExtension, the same one Safari runs its
@@ -45,6 +53,7 @@ final class Extensions: NSObject, ObservableObject {
     /// Every page view built for a tab is handed the controller at birth —
     /// it can't be given one later.
     static func attach(_ configuration: WKWebViewConfiguration) {
+        if EXTENSIONS_HIDDEN { return }
         configuration.webExtensionController = shared.controller
     }
 
@@ -106,12 +115,11 @@ final class Extensions: NSObject, ObservableObject {
         // extension's pages keep what they store where the browser does —
         // and a test run's apart from the real one's.
         views.websiteDataStore = Store.websites
-        // The same user agent as the web tabs, to the letter. WebKit gives
-        // workers the user agent of the last page that loaded and, when it
-        // differs, stops the running workers to apply it — and extension
-        // workers it then never starts again: every page that opened killed
-        // the extensions.
-        views.applicationNameForUserAgent = Web.userAgentSuffix
+        // No applicationNameForUserAgent, matching the web tabs to the
+        // letter (see Web.configuration): WebKit gives workers the user
+        // agent of the last page that loaded and, when it differs, stops
+        // the running workers to apply it — and extension workers it then
+        // never starts again.
         // A test run sits behind other windows, where WebKit slows its views
         // to a crawl and messages between an extension's popup and its
         // worker stop arriving. Not what anyone is testing.
@@ -127,6 +135,9 @@ final class Extensions: NSObject, ObservableObject {
 
     func start(for browser: Browser) {
         self.browser = browser
+        // Hidden for the first public release: previously installed
+        // extensions stay on disk (reversible) but nothing loads.
+        if EXTENSIONS_HIDDEN { return }
         controller.didOpenWindow(window)
         browser.$tabs
             .receive(on: DispatchQueue.main)
@@ -215,6 +226,7 @@ final class Extensions: NSObject, ObservableObject {
 
     @discardableResult
     private func load(_ item: Installed) async -> Bool {
+        if EXTENSIONS_HIDDEN { return false }
         // The shim this build of Satori carries, in place of whatever the
         // build that installed it carried.
         try? ExtensionShims.prepare(Extensions.folder(for: item.id))
@@ -269,6 +281,9 @@ final class Extensions: NSObject, ObservableObject {
     /// `confirm: false` is for the bench in a test run only — there is no
     /// way to reach it from the real browser.
     func install(from text: String, confirm: Bool = true) {
+        // Hidden for the first public release: the Web Store install path
+        // is a quiet no-op.
+        if EXTENSIONS_HIDDEN { return }
         guard let id = Crx.id(in: text) else {
             browser?.announce(Crx.Refused.notAnID.localizedDescription)
             return
@@ -297,6 +312,7 @@ final class Extensions: NSObject, ObservableObject {
     /// An unpacked extension from disk — a developer's own, or one exported
     /// from another browser. Copied in, so moving the original breaks nothing.
     func installFolder() {
+        if EXTENSIONS_HIDDEN { return }
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
@@ -307,8 +323,9 @@ final class Extensions: NSObject, ObservableObject {
     }
 
     func installFolder(at source: URL, confirm: Bool = true) {
+        if EXTENSIONS_HIDDEN { return }
         guard FileManager.default.fileExists(atPath: source.appendingPathComponent("manifest.json").path) else {
-            browser?.announce("That folder has no manifest.json")
+            browser?.announce("That folder holds no manifest.json")
             return
         }
         let id = "local-" + String(UUID().uuidString.prefix(8)).lowercased()
@@ -319,7 +336,7 @@ final class Extensions: NSObject, ObservableObject {
             try FileManager.default.copyItem(at: source, to: staged)
             try ExtensionShims.prepare(staged)
         } catch {
-            browser?.announce("Couldn't copy the extension")
+            browser?.announce("The extension could not be copied")
             return
         }
         Task { try? await admit(staged, as: id, fromStore: false, finalFolder: Extensions.folder(for: id), confirm: confirm || !Store.testing, source: source) }
@@ -329,13 +346,14 @@ final class Extensions: NSObject, ObservableObject {
     /// in developer mode. One loaded from a folder is copied in afresh from
     /// that folder first, so what its author just saved is what runs.
     func reload(_ id: String) {
+        if EXTENSIONS_HIDDEN { return }
         guard let index = installed.firstIndex(where: { $0.id == id }) else { return }
         let target = Extensions.folder(for: id)
         if let path = installed[index].source {
             let source = URL(fileURLWithPath: path, isDirectory: true)
             let files = FileManager.default
             guard files.fileExists(atPath: source.appendingPathComponent("manifest.json").path) else {
-                browser?.announce("The folder \(installed[index].name) was loaded from is gone")
+                browser?.announce("The folder \(installed[index].name) came from is gone")
                 return
             }
             let staged = Extensions.folder.appendingPathComponent(".staging-\(id)", isDirectory: true)
@@ -347,7 +365,7 @@ final class Extensions: NSObject, ObservableObject {
                 try files.moveItem(at: staged, to: target)
             } catch {
                 try? files.removeItem(at: staged)
-                browser?.announce("Couldn't copy \(installed[index].name) again")
+                browser?.announce("Could not copy \(installed[index].name) again")
                 return
             }
         }
@@ -362,7 +380,7 @@ final class Extensions: NSObject, ObservableObject {
                 save()
             }
             guard let item = installed.first(where: { $0.id == id }), item.enabled else { return }
-            browser?.announce(await load(item) ? "\(item.name) reloaded" : "\(item.name) couldn't start — see Settings › Extensions")
+            browser?.announce(await load(item) ? "\(item.name) runs again" : "\(item.name) could not start. See Settings › Extensions.")
         }
     }
 
@@ -453,7 +471,7 @@ final class Extensions: NSObject, ObservableObject {
         if await load(item) {
             browser?.announce("\(name) is installed")
         } else {
-            browser?.announce("\(name) is installed, but WebKit couldn't start it")
+            browser?.announce("\(name) is installed, but WebKit could not start it")
         }
     }
 
@@ -476,6 +494,7 @@ final class Extensions: NSObject, ObservableObject {
     /// last — once you've said yes to it. Nil while nobody asks, or you
     /// said no.
     var newTabPage: URL? {
+        if EXTENSIONS_HIDDEN { return nil }
         guard let (id, url) = newTabCandidate else { return nil }
         return Store.settings.object(forKey: "extensions.newtab.\(id)") as? Bool == true ? url : nil
     }
@@ -491,11 +510,12 @@ final class Extensions: NSObject, ObservableObject {
     /// the new tab — an extension that did it quietly could be anything.
     /// So does Satori, and then shows the page in the tab just opened.
     func offerNewTabPage(into tab: Tab) {
+        if EXTENSIONS_HIDDEN { return }
         guard let (id, url) = newTabCandidate, Store.settings.object(forKey: "extensions.newtab.\(id)") == nil,
               let name = installed.first(where: { $0.id == id })?.name else { return }
         Task {
             let yes = await ask("Show “\(name)” in new tabs?", detail: "It asked to replace the new tab page. You can change this later in Settings › Extensions.",
-                                icon: contexts[id]?.webExtension.icon(for: CGSize(width: 64, height: 64)), yes: "Keep It", no: "Don't Allow")
+                                icon: contexts[id]?.webExtension.icon(for: CGSize(width: 64, height: 64)), yes: "Keep it", no: "Don't Allow")
             Store.settings.set(yes, forKey: "extensions.newtab.\(id)")
             if yes, tab.isBlank, let browser { browser.replaceBlank(tab, with: url) }
         }
@@ -514,10 +534,12 @@ final class Extensions: NSObject, ObservableObject {
     /// The extension, on and running, that asked the browser not to offer to
     /// save passwords — a password manager doing the saving itself.
     var passwordSavingTakenBy: String? {
-        installed.first { $0.enabled && Extensions.settings(for: $0.id)["privacy.services.passwordSavingEnabled"] as? Bool == false }?.name
+        if EXTENSIONS_HIDDEN { return nil }
+        return installed.first { $0.enabled && Extensions.settings(for: $0.id)["privacy.services.passwordSavingEnabled"] as? Bool == false }?.name
     }
 
     func setEnabled(_ id: String, _ on: Bool) {
+        if EXTENSIONS_HIDDEN { return }
         guard let index = installed.firstIndex(where: { $0.id == id }) else { return }
         installed[index].enabled = on
         save()
@@ -529,6 +551,7 @@ final class Extensions: NSObject, ObservableObject {
     }
 
     func openOptions(_ id: String) {
+        if EXTENSIONS_HIDDEN { return }
         guard let url = contexts[id]?.optionsPageURL else { return }
         browser?.open(url, foreground: true)
     }
@@ -539,6 +562,7 @@ final class Extensions: NSObject, ObservableObject {
     /// a newer version; if so it is fetched, checked and swapped in. One that
     /// asks for more than it was installed with is asked about first.
     func checkForUpdates() {
+        if EXTENSIONS_HIDDEN { return }
         let key = "extensions.checked"
         let last = Store.settings.object(forKey: key) as? Date ?? .distantPast
         guard Date().timeIntervalSince(last) > 60 * 60 * 20 else { return }
@@ -716,6 +740,7 @@ final class Extensions: NSObject, ObservableObject {
 
     /// One per loaded extension that has something to press, in install order.
     var buttons: [Button] {
+        if EXTENSIONS_HIDDEN { return [] }
         _ = actionsChanged
         let tab = activeAdapter
         return installed.compactMap { item in
@@ -733,6 +758,7 @@ final class Extensions: NSObject, ObservableObject {
     }
 
     func press(_ id: String) {
+        if EXTENSIONS_HIDDEN { return }
         guard let context = contexts[id] else { return }
         if let tab = activeAdapter { context.userGesturePerformed(in: tab) }
         // An extension that asked for its button to open its side panel.
@@ -763,6 +789,7 @@ final class Extensions: NSObject, ObservableObject {
 
     /// A keystroke an extension registered for.
     func take(_ event: NSEvent) -> Bool {
+        if EXTENSIONS_HIDDEN { return false }
         for context in contexts.values where context.command(for: event) != nil {
             return context.performCommand(for: event)
         }
@@ -771,6 +798,7 @@ final class Extensions: NSObject, ObservableObject {
 
     /// Right-click items an extension added, for the page's menu.
     func menuItems(for tab: Tab) -> [NSMenuItem] {
+        if EXTENSIONS_HIDDEN { return [] }
         guard !tab.shy else { return [] }
         let adapter = adapter(for: tab)
         return contexts.values.flatMap { $0.menuItems(for: adapter) }
@@ -855,7 +883,8 @@ extension Extensions: WKWebExtensionControllerDelegate {
         if applicationIdentifier == nil || applicationIdentifier == ExtensionShims.application {
             return try await ExtensionShims.answer(message, from: extensionContext, owner: self)
         }
-        let id = extensionContext.uniqueIdentifier, host = applicationIdentifier!
+        guard let host = applicationIdentifier else { throw ExtensionNative.Refused(why: "No host named") }
+        let id = extensionContext.uniqueIdentifier
         do {
             return try await ExtensionNative.send(message, to: host, from: id)
         } catch {
@@ -989,10 +1018,15 @@ struct ExtensionSlot: View {
     /// The side the list opens toward: down from the top row, out to the
     /// right from the sidebar.
     var edge: Edge = .bottom
+    /// Website tint behind the top bar. Nil keeps existing Palette styling;
+    /// the sidebar uses the default.
+    var tint: Tint? = nil
 
     var body: some View {
-        if #available(macOS 15.4, *) {
-            ExtensionButtons(extensions: .shared, edge: edge)
+        // Hidden for the first public release: no toolbar slot at all —
+        // neither pinned icons nor the puzzle button.
+        if !EXTENSIONS_HIDDEN, #available(macOS 15.4, *) {
+            ExtensionButtons(extensions: .shared, edge: edge, tint: tint)
         }
     }
 }
@@ -1001,16 +1035,17 @@ struct ExtensionSlot: View {
 private struct ExtensionButtons: View {
     @ObservedObject var extensions: Extensions
     let edge: Edge
+    var tint: Tint? = nil
 
     var body: some View {
         if !extensions.installed.isEmpty {
             HStack(spacing: 2) {
                 ForEach(extensions.buttons.filter(\.pinned)) { button in
-                    ActionButton(button: button) { extensions.press(button.id) }
+                    ActionButton(button: button, tint: tint) { extensions.press(button.id) }
                         .background(Anchor(id: button.id))
                         .contextMenu { ExtensionActions(id: button.id, name: button.name, extensions: extensions) }
                 }
-                Door(icon: "puzzlepiece.extension", on: extensions.menuOpen, help: "Extensions") {
+                Door(icon: "plus.square.on.square", on: extensions.menuOpen, help: "Extensions", tint: tint) {
                     extensions.menuOpen.toggle()
                 }
                 .background(Anchor(id: Extensions.menuAnchor))
@@ -1023,6 +1058,7 @@ private struct ExtensionButtons: View {
 
     private struct ActionButton: View {
         let button: Extensions.Button
+        var tint: Tint? = nil
         let press: () -> Void
         @State private var hovering = false
 
@@ -1032,7 +1068,7 @@ private struct ExtensionButtons: View {
                     .frame(width: 26, height: 26)
                     .background(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(hovering ? Palette.hover : .clear)
+                            .fill(hovering ? (tint != nil ? Palette.foreground(on: tint).opacity(0.12) : Palette.hover) : .clear)
                     )
                     .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
@@ -1147,7 +1183,7 @@ private struct ExtensionMenu: View {
         VStack(alignment: .leading, spacing: 0) {
             let buttons = extensions.buttons
             if buttons.isEmpty {
-                Text("None of your extensions is on")
+                Text("No extensions are on")
                     .font(.system(size: 12.5))
                     .foregroundStyle(Palette.muted)
                     .padding(14)

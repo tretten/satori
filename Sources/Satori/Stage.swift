@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import WebKit
 
@@ -11,12 +12,20 @@ import WebKit
 /// what turns that into a redraw.
 struct Page: View {
     @ObservedObject var tab: Tab
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Obscured top inset for the page (Safari-Compact bar height): 48 under
+    /// the overlay strip, 0 with the sidebar / immersed / floating. Applied as
+    /// WKWebView obscured insets (shifts normal flow AND fixed/sticky headers;
+    /// scrolled content slides beneath the bar). Kept as a parameter so the
+    /// stage can restore the right value on return (e.g. from the floating
+    /// window, which clears it to 0).
+    var topInset: CGFloat = 0
 
     var body: some View {
         ZStack {
             // A tab put down with ⌘W has no view, and asking for one here
             // would build an empty one a frame before the stage moves on.
-            WebStage(page: tab.isBlank || tab.asleep ? nil : tab.web)
+            WebStage(page: tab.isBlank || tab.asleep ? nil : tab.web, topInset: topInset, isFloating: tab.floating)
 
             if let cover = tab.cover {
                 // The page as it was left, while it is rebuilt underneath —
@@ -47,6 +56,18 @@ struct Page: View {
                     .transition(.opacity)
             }
 
+            // The link under the pointer, bottom-left — above the page, below
+            // the browser chrome (the strip, bars, field and panels are outer
+            // overlays). Hit-testing stays with the page, so scrolling,
+            // clicks, selection and find-in-page are untouched.
+            if let link = tab.hoveredLink {
+                LinkBubble(url: link)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                    .padding(.leading, 10)
+                    .padding(.bottom, 10)
+                    .transition(.opacity)
+            }
+
             if let pull = tab.pull {
                 Disc(pull: pull)
                     // A disc for each edge, never one that changes edges: a
@@ -61,6 +82,7 @@ struct Page: View {
         }
         .animation(Motion.quick, value: tab.failure)
         .animation(Motion.quick, value: tab.floating)
+        .animation(reduceMotion ? nil : Motion.quick, value: tab.hoveredLink)
         .animation(.easeOut(duration: 0.2), value: tab.cover == nil)
         .animation(.easeOut(duration: 0.16), value: tab.pull == nil)
     }
@@ -119,13 +141,42 @@ private struct Disc: View {
 /// reload, no lost scroll position, no forgotten form.
 struct WebStage: NSViewRepresentable {
     let page: NSView?
+    var topInset: CGFloat = 0
+    var isFloating: Bool = false
 
     func makeNSView(context: Context) -> StageView { StageView() }
 
     func updateNSView(_ view: StageView, context: Context) {
-        view.show(page)
+        view.show(page, topInset: topInset, isFloating: isFloating)
     }
 }
+
+/// Safari-Compact obscured-insets bridge (WebKit-private, used defensively).
+///
+/// On macOS `WKWebView._setTopContentInset:` maps directly to WebKit's
+/// `obscuredContentInsets.top` (WKWebViewMac.mm: the `_topContentInset` getter
+/// returns `obscuredContentInsets().top()` and the setter forwards to
+/// `setObscuredContentInsets`). Unlike `NSScrollView.contentInsets.top` — which
+/// only pads normal flow — obscured insets shift the scroll origin AND
+/// viewport-anchored `position:fixed/sticky; top:0` constraints, while scrolled
+/// content still slides beneath the overlay: exactly Safari Compact behavior.
+/// Declared in WKWebViewPrivate.h as `_topContentInset` (long-standing),
+/// `_setTopContentInset:immediate:` (macOS 15.4+) and
+/// `_setObscuredContentInsets:immediate:` / `_obscuredContentInsets` (macOS 26+).
+/// No link-time dependency: called only after `responds(to:)`; on an OS where
+/// neither selector exists the overlay stays and sticky/fixed headers slide
+/// under the bar (documented limitation, no crash). Developer-ID distributed
+/// (not App Store), so private-SPI use is a policy non-issue; still the least
+/// invasive option — no per-site CSS/JS, no mutation loops, find/zoom/reader
+/// untouched (WebKit-native layout inset).
+@objc private protocol WKTopContentInset {
+    @objc(_setTopContentInset:)
+    optional func setTopContentInset(_ inset: CGFloat)
+    @objc(_setTopContentInset:immediate:)
+    optional func setTopContentInset(_ inset: CGFloat, immediate: Bool)
+}
+
+extension WKWebView: WKTopContentInset {}
 
 final class StageView: NSView {
     /// What this stage has been told to show, and the only thing it keeps.
@@ -140,14 +191,23 @@ final class StageView: NSView {
     /// Now there is one fact and one rule: show `wanted`, and put that right on
     /// every layout. Nothing to fall out of step with.
     private weak var wanted: NSView?
+    /// The obscured top inset to hold on `wanted` (Safari-Compact bar height).
+    /// Stored so `layout()` re-applies it without new parameters.
+    private var wantedInset: CGFloat = 0
+    /// Whether `wanted` belongs to a tab whose page is out in the floating
+    /// video window. Stored alongside `wantedInset` so `layout()` re-applies
+    /// the floating zero inset without new parameters.
+    private var wantedFloating: Bool = false
 
     override func layout() {
         super.layout()
         settle()
     }
 
-    func show(_ page: NSView?) {
+    func show(_ page: NSView?, topInset: CGFloat = 0, isFloating: Bool = false) {
         wanted = page
+        wantedInset = topInset
+        wantedFloating = isFloating
         settle()
     }
 
@@ -158,13 +218,47 @@ final class StageView: NSView {
             view.removeFromSuperview()
         }
 
+        // The inset lives on the page itself (WKWebView obscured insets), so
+        // a page off-screen keeps the right one for its return. A page out in
+        // the floating video window keeps none: any top inset would push the
+        // fixed-position video down, leaving its black page background as a
+        // band across the top. Float.lift clears it on entry; actively
+        // re-clearing it here keeps every later layout from putting it back.
+        // No CSS is injected; scroll position, zoom, find and reader mode are
+        // untouched — only WebKit-native obscured insets change.
+        //
+        // Gated on both the owning tab's floating flag and the window level:
+        // the flag covers the detached moment where `window` is nil between
+        // `removeFromSuperview` and the panel's `orderFrontRegardless` (where
+        // a level check alone reads nil as "not floating" and re-applies 48),
+        // while the level covers any path that reaches here without the flag.
+        if let wanted {
+            if wantedFloating || wanted.window?.level == .floating {
+                StageView.applyTopInset(0, to: wanted)
+            } else {
+                StageView.applyTopInset(wantedInset, to: wanted)
+            }
+        }
+
         guard let wanted, window != nil else { return }
+        // The floating video window owns the page while it shows it. Taking
+        // it back here is how a float would be stolen mid-play, so the stage
+        // stays empty until the page lands home on its own.
+        if wantedFloating || wanted.window?.level == .floating { return }
         if wanted.superview !== self {
             // A web view can have only one superview, so taking it back is how
             // it is taken back.
             wanted.removeFromSuperview()
             wanted.alphaValue = 1
             addSubview(wanted)
+            // Back from another tab, a page could come in drawn right up
+            // under the strip, its inset gone. WebKit ignores being told the
+            // value it believes it already has, so it is walked off and back
+            // on to be sent again.
+            if wantedInset != 0 {
+                StageView.applyTopInset(0, to: wanted)
+                StageView.applyTopInset(wantedInset, to: wanted)
+            }
             // A web view coming back into a window sometimes keeps the last
             // picture it had — which, after a while out of one, is nothing.
             // Asking it to draw again is cheap and is what brings it back.
@@ -173,6 +267,58 @@ final class StageView: NSView {
             wanted.layer?.setNeedsDisplay()
         }
         wanted.frame = bounds
+    }
+
+    /// The WKWebView's inner scroll view, found by shape rather than by
+    /// class: on macOS WebKit keeps it private, and it is the only
+    /// NSScrollView under the page.
+    private static func scrollInside(_ view: NSView) -> NSScrollView? {
+        if let scroll = view as? NSScrollView { return scroll }
+        for sub in view.subviews {
+            if let found = scrollInside(sub) { return found }
+        }
+        return nil
+    }
+
+    /// Safari-Compact top inset for a page: WebKit obscured insets on the
+    /// WKWebView itself, plus clearing the legacy NSScrollView padding.
+    ///
+    /// The scroll-view `contentInsets.top` path is retired to 0 (it moves normal
+    /// flow but NOT viewport-anchored `position:fixed/sticky; top:0` site
+    /// headers, which keep sticking to the viewport top under the bar). The
+    /// WKWebView `_setTopContentInset:` SPI maps to `obscuredContentInsets.top`
+    /// and shifts both the scroll origin and sticky/fixed constraints, while
+    /// scrolled content still slides beneath the translucent overlay.
+    /// Automatic adjustment is turned off so AppKit never overwrites the manual
+    /// values on layout or resize; only the top edge is touched. `immediate:`
+    /// (macOS 15.4+) is preferred where present so tab switches and tint flips
+    /// apply without a frame of lag; otherwise the plain setter (present since
+    /// ~10.13, covering the macOS 14 deployment floor) is used. Both are
+    /// `responds(to:)`-gated; without either, the page keeps overlay + 0 inset.
+    static func applyTopInset(_ top: CGFloat, to page: NSView) {
+        if let scroll = scrollInside(page) {
+            if scroll.automaticallyAdjustsContentInsets {
+                scroll.automaticallyAdjustsContentInsets = false
+            }
+            var content = scroll.contentInsets
+            if content.top != 0 {
+                content.top = 0
+                scroll.contentInsets = content
+            }
+            var scroller = scroll.scrollerInsets
+            if scroller.top != 0 {
+                scroller.top = 0
+                scroll.scrollerInsets = scroller
+            }
+        }
+        guard let web = page as? WKWebView else { return }
+        let immediateSel = Selector(("_setTopContentInset:immediate:"))
+        let plainSel = Selector(("_setTopContentInset:"))
+        if web.responds(to: immediateSel) {
+            (web as WKTopContentInset).setTopContentInset?(top, immediate: true)
+        } else if web.responds(to: plainSel) {
+            (web as WKTopContentInset).setTopContentInset?(top)
+        }
     }
 }
 
@@ -247,6 +393,8 @@ struct DragStrip: NSViewRepresentable {
     var below: CGFloat = 0
     /// The run at the trailing end that belongs to a button.
     var trailing: CGFloat = 0
+    /// A single click that went nowhere.
+    var onClick: (() -> Void)?
 
     func makeNSView(context: Context) -> NSView { Strip() }
 
@@ -254,12 +402,14 @@ struct DragStrip: NSViewRepresentable {
         (view as? Strip)?.reserved = reserved
         (view as? Strip)?.below = below
         (view as? Strip)?.trailing = trailing
+        (view as? Strip)?.onClick = onClick
     }
 
     private final class Strip: NSView {
         var reserved: CGFloat = 0
         var below: CGFloat = 0
         var trailing: CGFloat = 0
+        var onClick: (() -> Void)?
 
         private var grab = NSPoint.zero
         private var origin = NSPoint.zero
@@ -296,7 +446,9 @@ struct DragStrip: NSViewRepresentable {
         /// click and put the window back on the second, and looked like
         /// nothing at all.
         override func mouseUp(with event: NSEvent) {
-            guard let window, !moved, event.clickCount == 2 else { return }
+            guard let window, !moved else { return }
+            if event.clickCount == 1 { onClick?() }
+            guard event.clickCount == 2 else { return }
             // System Settings › Desktop & Dock: what double-clicking a title
             // bar should do. Unset means the default, which fills the screen.
             switch UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick") {

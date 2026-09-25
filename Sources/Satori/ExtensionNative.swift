@@ -84,17 +84,17 @@ enum ExtensionNative {
     static func connect(_ port: WKWebExtension.MessagePort, from extensionID: String) throws {
         guard let name = port.applicationIdentifier else { throw Refused(why: "No host named") }
         let pipe = try makePipe(name: name, extensionID: extensionID)
-        pipe.onMessage = { message in
-            DispatchQueue.main.async { port.sendMessage(message, completionHandler: nil) }
+        pipe.onMessage = { [weak port] message in
+            DispatchQueue.main.async { port?.sendMessage(message, completionHandler: nil) }
         }
-        pipe.onExit = {
-            DispatchQueue.main.async { if !port.isDisconnected { port.disconnect() } }
+        pipe.onExit = { [weak port] in
+            DispatchQueue.main.async { if port?.isDisconnected == false { port?.disconnect() } }
         }
-        port.messageHandler = { message, _ in
+        port.messageHandler = { [weak pipe] message, _ in
             guard let message else { return }
-            try? pipe.write(message)
+            try? pipe?.write(message)
         }
-        port.disconnectHandler = { _ in pipe.stop() }
+        port.disconnectHandler = { [weak pipe] _ in pipe?.stop() }
         keepAlive(pipe)
     }
 
@@ -103,8 +103,9 @@ enum ExtensionNative {
     private static func keepAlive(_ pipe: HostPipe) {
         alive[ObjectIdentifier(pipe)] = pipe
         let previous = pipe.onExit
-        pipe.onExit = {
+        pipe.onExit = { [weak pipe] in
             previous?()
+            guard let pipe else { return }
             DispatchQueue.main.async { alive[ObjectIdentifier(pipe)] = nil }
         }
     }
@@ -171,8 +172,17 @@ final class HostPipe: @unchecked Sendable {
         lock.lock()
         buffer.append(chunk)
         var messages: [Any] = []
+        var corrupt = false
         while buffer.count >= 4 {
             let length = Int(buffer.prefix(4).withUnsafeBytes { $0.loadUnaligned(as: UInt32.self).littleEndian })
+            // Chrome caps a native message at 1MB (see write); a longer
+            // frame is a misbehaving host, not a message to buffer without
+            // end. Drop the connection instead of growing without bound.
+            guard length <= 1 << 20 else {
+                buffer.removeAll()
+                corrupt = true
+                break
+            }
             guard buffer.count >= 4 + length else { break }
             let body = buffer.subdata(in: 4..<(4 + length))
             buffer.removeSubrange(0..<(4 + length))
@@ -188,6 +198,7 @@ final class HostPipe: @unchecked Sendable {
         lock.unlock()
         handed.forEach { $0.0.resume(returning: $0.1) }
         rest.forEach { onMessage?($0) }
+        if corrupt { finish() }
     }
 
     private func finish() {

@@ -21,6 +21,13 @@ final class ExtensionPopup: NSObject, WKUIDelegate, WKNavigationDelegate, NSPopo
 
     private var popover: NSPopover?
     private var web: WKWebView?
+    /// The view the popover hangs from, held while it is up. The toolbar's
+    /// buttons come and go with `actionsChanged` — an extension updating its
+    /// icon (iCloud Passwords does on every native-port change) rebuilds them
+    /// and drops the view the popover was shown from. AppKit keeps only a weak
+    /// reference to that positioning view, so without this the next layout
+    /// dereferences a freed view and dies in `updateTrackingAreas`.
+    private var anchor: NSView?
     /// The popup as WebKit is told about it: a page it can find, belonging
     /// to the browser's window — Chrome gives a popup no window of its own,
     /// so "the current window" from a popup is the browser's, and so is the
@@ -38,7 +45,9 @@ final class ExtensionPopup: NSObject, WKUIDelegate, WKNavigationDelegate, NSPopo
         // Sized the way Chrome sizes a popup (see preferred), unseen, while
         // the popover already stands at the size this popup had last time;
         // then shown. It has to be in the window meanwhile: WebKit suspends
-        // a page that is in none.
+        // a page that is in none. It is also told about before it loads: a
+        // page that starts first can send its first messages to its worker
+        // from a tab WebKit does not know yet.
         let web = WKWebView(frame: NSRect(x: 0, y: 0, width: 25, height: 25), configuration: configuration)
         web.uiDelegate = self
         web.navigationDelegate = self
@@ -46,7 +55,6 @@ final class ExtensionPopup: NSObject, WKUIDelegate, WKNavigationDelegate, NSPopo
         // background unset, and their dark text over the popover's dark
         // material would vanish.
         web.alphaValue = 0
-        web.load(URLRequest(url: url))
 
         let stage = NSView(frame: NSRect(origin: .zero, size: ExtensionPopup.lastSize[context.uniqueIdentifier] ?? NSSize(width: 360, height: 240)))
         stage.addSubview(web)
@@ -61,18 +69,22 @@ final class ExtensionPopup: NSObject, WKUIDelegate, WKNavigationDelegate, NSPopo
 
         self.web = web
         self.popover = popover
+        self.anchor = nil
         extensionID = context.uniqueIdentifier
         let page = PopupPage(web: web)
         self.page = page
-        Extensions.shared.controller.didOpenTab(page)
 
         shown = false
         if let anchor, anchor.window != nil {
+            self.anchor = anchor
             popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .maxY)
         } else if let content = (NSApp.mainWindow ?? NSApp.windows.first(where: { $0.isVisible && $0.canBecomeMain && $0.frame.minX > -10_000 }))?.contentView {
+            self.anchor = content
             let spot = NSRect(x: content.bounds.maxX - 60, y: content.bounds.maxY - 40, width: 1, height: 1)
             popover.show(relativeTo: spot, of: content, preferredEdge: .minY)
         }
+        Extensions.shared.controller.didOpenTab(page)
+        web.load(URLRequest(url: url))
         // Sized once loaded — or after a moment regardless, for a page that
         // never finishes loading.
         // Measured when the document is built (see below) or has loaded;
@@ -135,6 +147,7 @@ final class ExtensionPopup: NSObject, WKUIDelegate, WKNavigationDelegate, NSPopo
         page = nil
         popover = nil
         web = nil
+        anchor = nil
         extensionID = nil
     }
 
@@ -251,7 +264,8 @@ final class ExtensionPopup: NSObject, WKUIDelegate, WKNavigationDelegate, NSPopo
         if ticks <= 8 {
             web.evaluateJavaScript("(\(ExtensionPopup.preferred))()") { [weak self] value, _ in
                 MainActor.assumeIsolated {
-                    guard let self, let pair = value as? [Double], pair.count == 2 else { return }
+                    guard let self, web === self.web, popover === self.popover,
+                          let pair = value as? [Double], pair.count == 2 else { return }
                     let wanted = NSSize(width: pair[0], height: pair[1])
                     let now = popover.contentSize
                     if abs(wanted.width - now.width) > 2 || abs(wanted.height - now.height) > 2 { self.apply(wanted) }
@@ -259,9 +273,10 @@ final class ExtensionPopup: NSObject, WKUIDelegate, WKNavigationDelegate, NSPopo
             }
             return
         }
-        web.evaluateJavaScript("[\(ExtensionPopup.reach)('width'), (() => { const d = document.documentElement; return d && d.scrollHeight > d.clientHeight ? d.scrollHeight : 0; })()]") { value, _ in
+        web.evaluateJavaScript("[\(ExtensionPopup.reach)('width'), (() => { const d = document.documentElement; return d && d.scrollHeight > d.clientHeight ? d.scrollHeight : 0; })()]") { [weak self] value, _ in
             MainActor.assumeIsolated {
-                guard let pair = value as? [Double], pair.count == 2 else { return }
+                guard let self, web === self.web, popover === self.popover,
+                      let pair = value as? [Double], pair.count == 2 else { return }
                 let now = popover.contentSize
                 let wanted = NSSize(width: min(800, max(now.width, pair[0])), height: min(600, max(now.height, pair[1])))
                 if wanted != now { self.apply(wanted) }

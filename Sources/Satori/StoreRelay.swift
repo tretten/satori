@@ -61,7 +61,7 @@ final class StoreRelay: NSObject, WKScriptMessageHandler {
       function bannerOf(button) {
         var box = null, up = button.parentElement;
         while (up && up !== document.body) {
-          if (up.querySelector('button[disabled], button[data-satori]')) break;
+          if (up.querySelector('button[disabled], button[data-office]')) break;
           if ((up.innerText || '').length > 160) break;
           box = up;
           up = up.parentElement;
@@ -127,14 +127,14 @@ final class StoreRelay: NSObject, WKScriptMessageHandler {
 
       // The store keeps the pages it has left, hidden, beside the one it shows.
       function renderAll() {
-        var mine = document.querySelectorAll('button[data-satori="add"]');
+        var mine = document.querySelectorAll('button[data-office="add"]');
         for (var i = 0; i < mine.length; i++) render(mine[i]);
       }
 
       // Caught on the window, before the store's own handlers — which listen
       // on the document — can see the click at all.
       window.addEventListener('click', function (e) {
-        var mine = e.target && e.target.closest && e.target.closest('button[data-satori="add"]');
+        var mine = e.target && e.target.closest && e.target.closest('button[data-office="add"]');
         if (!mine) return;
         e.preventDefault();
         e.stopImmediatePropagation();
@@ -167,6 +167,7 @@ extension Browser {
 
     /// The page's "Add to Satori" was pressed: the extension this tab is showing.
     func addFromStore(_ tab: Tab) {
+        if EXTENSIONS_HIDDEN { return }
         guard #available(macOS 15.4, *), let url = tab.address, StoreOffer.isStorePage(url) else { return }
         Extensions.shared.install(from: url.absoluteString)
     }
@@ -174,12 +175,14 @@ extension Browser {
     /// Tells a store page what is installed and what is on its way, so its
     /// button can say "Added to Satori" or "Adding…".
     func tellStore(_ tab: Tab) {
+        if EXTENSIONS_HIDDEN { return }
         guard #available(macOS 15.4, *), let url = tab.address, StoreOffer.isStorePage(url) else { return }
         tab.tellStore(installed: Extensions.shared.installed.map(\.id), busy: Extensions.shared.busy)
     }
 
     /// And tells every store page again whenever either changes.
     func followStore() {
+        if EXTENSIONS_HIDDEN { return }
         guard #available(macOS 15.4, *) else { return }
         let extensions = Extensions.shared
         storeWatch = extensions.$installed.map { _ in () }

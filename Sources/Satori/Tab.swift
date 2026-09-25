@@ -15,13 +15,11 @@ enum Web {
     /// Modern WebKit pools processes by data store on its own — every tab
     /// asking for the same one is what gets the second tab a warm process, and
     /// the old WKProcessPool knob does nothing now.
-    /// What every view says it is after WebKit's own
-    /// "AppleWebKit … (KHTML, like Gecko)" — web tabs and extension views
-    /// alike (see Extensions.init). A Chrome tail, not Safari's: string-based
-    /// bot checks and captchas see a browser they know. The engine stays
-    /// WebKit, which no string can change — anything doing real feature
-    /// detection still sees WebKit.
-    static let userAgentSuffix = "Chrome/\(Crx.chromeVersion) Safari/537.36"
+    /// Web tabs and extension views alike send WebKit's native user agent
+    /// with nothing appended (see Extensions.init): claiming Chrome on a
+    /// WebKit engine, without Chromium client hints or JS identity, is an
+    /// inconsistent identity that bot management (Akamai, e.g. uniqlo.com)
+    /// refuses with 403 while Safari's consistent native UA passes.
 
     static func configuration(shy: Bool = false) -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
@@ -33,14 +31,9 @@ enum Web {
         // Chrome extensions see every page but a private one. The controller
         // has to be there when the view is made; it can't be added after.
         if #available(macOS 15.4, *), !shy { MainActor.assumeIsolated { Extensions.attach(config) } }
-        // Left alone, WKWebView says only "AppleWebKit … (KHTML, like Gecko)" —
-        // no browser, no version. Google reads that as something it doesn't
-        // recognise and serves the stripped-back page from a decade ago:
-        // no side panel, no dark mode, none of the modern tabs. A Chrome
-        // tail turns it into a browser the web knows; the configuration can
-        // only append, and the same tail everywhere keeps extension workers
-        // alive (see Extensions.init).
-        config.applicationNameForUserAgent = Web.userAgentSuffix
+        // applicationNameForUserAgent is left unset on purpose, matching the
+        // extension views (see Extensions.init): WebKit then sends its native
+        // user agent everywhere, and workers stay alive.
         config.allowsAirPlayForMediaPlayback = true
         // Off by default on macOS, which is why a full-screen button on a video
         // did nothing at all: the page asks, and WebKit refuses without a word.
@@ -117,7 +110,7 @@ final class Tab: ObservableObject, Identifiable {
         }
         web.evaluateJavaScript(Reader.script) { [weak self] answer, _ in
             let worked = (answer as? String) == "read"
-            if worked { self?.reader = true }
+            if worked { self?.reader = true; self?.clearHover() }
             done(worked)
         }
     }
@@ -145,6 +138,44 @@ final class Tab: ObservableObject, Identifiable {
 
     /// True while this tab's page is out in the little window.
     @Published var floating = false
+
+    /// True while the page holds a video worth floating: playing, not ended,
+    /// and loaded enough to show a frame. Set by a lightweight non-mutating
+    /// DOM probe (`Isolate.probe`) plus page-event reports (`FloatRelay`),
+    /// never by polling. The tab pill shows the pop-out icon only while this
+    /// is true or the video is already out (`floating`).
+    @Published var canFloat = false
+
+    /// A page event's word on whether anything floatable is playing.
+    /// Ignored for blank or asleep tabs, which hold no page to ask.
+    func setFloatAvailability(_ ok: Bool) {
+        guard !isBlank, pending == nil else {
+            if canFloat { canFloat = false }
+            return
+        }
+        if canFloat != ok { canFloat = ok }
+    }
+
+    /// Navigation, failure, sleep and crashes leave nothing to float.
+    func clearFloatAvailability() {
+        if canFloat { canFloat = false }
+    }
+
+    /// Ask the page once whether anything on it could be floated. Active-tab
+    /// scoped by the caller: background tabs keep whatever they had until
+    /// they are looked at again. Never builds a view just to ask.
+    func refreshFloatAvailability() {
+        guard !isBlank, pending == nil, let built else {
+            clearFloatAvailability()
+            return
+        }
+        // Already out: the exit icon is showing regardless, and a probe
+        // cannot add anything to that.
+        if floating { return }
+        built.evaluateJavaScript(Isolate.probe) { [weak self] value, _ in
+            MainActor.assumeIsolated { self?.setFloatAvailability((value as? Bool) == true) }
+        }
+    }
 
     /// A sideways swipe in progress, for the disc that shows it.
     @Published var pull: Pull?
@@ -182,6 +213,22 @@ final class Tab: ObservableObject, Identifiable {
     /// which tab it is coming from.
     @Published var noisy = false
 
+    /// The resolved URL of the link under the pointer, if any — for the
+    /// bubble at the page's bottom-left (see LinkPreview.swift). Set by
+    /// `LinkRelay`; cleared on mouseout, navigation, sleep and tab switch.
+    @Published var hoveredLink: String?
+
+    /// A link hover report from the page. Kept only when it changes, so
+    /// rapid hovers move the bubble without redundant redraws.
+    func setHover(_ url: String) {
+        if hoveredLink != url { hoveredLink = url }
+    }
+
+    /// The pointer left the link, or the page went away.
+    func clearHover() {
+        if hoveredLink != nil { hoveredLink = nil }
+    }
+
     /// What the page hands back when you point at something and click it.
     var onPick: ((Tab, String, String, String) -> Void)?
     /// The page has a sign-in on it; the page has just sent one.
@@ -213,7 +260,9 @@ final class Tab: ObservableObject, Identifiable {
     private let forms = FormRelay()
     private let images = ImageRelay()
     private let videos = VideoRelay()
+    private let floats = FloatRelay()
     private let shop = StoreRelay()
+    private let links = LinkRelay()
     private let ears = AudioWatch()
     private var lastY: Double = 0
 
@@ -258,7 +307,7 @@ final class Tab: ObservableObject, Identifiable {
     /// The page's own colour at its top, read from the element just under the
     /// strip's edge so the strip can wear it and read as the page continuing
     /// upward.
-    @Published private(set) var themeColor: Color?
+    @Published private(set) var themeColor: Tint?
 
     private var watch: [NSKeyValueObservation] = []
 
@@ -294,6 +343,7 @@ final class Tab: ObservableObject, Identifiable {
         web.allowsBackForwardNavigationGestures = false
         web.onPull = { [weak self] pull in self?.pull = pull }
         web.onTouch = { [weak self] in self?.uncover() }
+        web.onAttach = { [weak self] in self?.applyTopInsetNow() }
         // Pages follow the appearance of the window they are drawn in, and the
         // window follows Settings › Appearance — so a site that honours
         // prefers-color-scheme goes dark with the frame, and not otherwise.
@@ -311,15 +361,25 @@ final class Tab: ObservableObject, Identifiable {
         controller.removeScriptMessageHandler(forName: FormRelay.name)
         controller.removeScriptMessageHandler(forName: ImageRelay.name)
         controller.removeScriptMessageHandler(forName: VideoRelay.name)
+        controller.removeScriptMessageHandler(forName: FloatRelay.name)
         controller.removeScriptMessageHandler(forName: StoreRelay.name)
+        controller.removeScriptMessageHandler(forName: LinkRelay.name)
         controller.add(relay, name: ScrollRelay.name)
         controller.add(veils_, name: VeilRelay.name)
         controller.add(images, name: ImageRelay.name)
         controller.add(videos, name: VideoRelay.name)
-        controller.add(shop, name: StoreRelay.name)
+        controller.add(floats, name: FloatRelay.name)
+        // Hidden for the first public release: the store relay stays
+        // unregistered, so store pages keep their own buttons.
+        if !EXTENSIONS_HIDDEN { controller.add(shop, name: StoreRelay.name) }
+        controller.add(links, name: LinkRelay.name)
         controller.add(forms, name: FormRelay.name)
         Shield.shared.protect(controller)
         built = web
+        // Eager strip inset at creation, before any load or first paint:
+        // the SwiftUI update path (`Page.topInset` → `updateNSView` → `show`
+        // → `settle`) can arrive after WebKit has already started rendering.
+        applyTopInsetNow()
         arm(hiding: veils)
 
         watch = [
@@ -359,7 +419,9 @@ final class Tab: ObservableObject, Identifiable {
         forms.tab = self
         images.tab = self
         videos.tab = self
+        floats.tab = self
         shop.tab = self
+        links.tab = self
         ears.watch(web) { [weak self] on in self?.noisy = on }
         return web
     }
@@ -420,17 +482,18 @@ final class Tab: ObservableObject, Identifiable {
             WKUserScript(source: VideoRelay.watch, injectionTime: .atDocumentStart, forMainFrameOnly: false)
         )
         controller.addUserScript(
-            WKUserScript(source: StoreRelay.script, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+            WKUserScript(source: FloatRelay.watch, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
         )
-        if !FormRelay.passkeysOffered {
+        // Hidden for the first public release: no "Add to Satori" rewriting
+        // of Web Store pages (a button that did nothing would be a dead end).
+        if !EXTENSIONS_HIDDEN {
             controller.addUserScript(
-                WKUserScript(
-                    source: FormRelay.withoutPasskeys,
-                    injectionTime: .atDocumentStart,
-                    forMainFrameOnly: false
-                )
+                WKUserScript(source: StoreRelay.script, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
             )
         }
+        controller.addUserScript(
+            WKUserScript(source: LinkRelay.watch, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+        )
         guard !css.isEmpty else { return }
         controller.addUserScript(
             WKUserScript(source: Veiling.style(css), injectionTime: .atDocumentStart, forMainFrameOnly: true)
@@ -549,7 +612,7 @@ final class Tab: ObservableObject, Identifiable {
 
     /// Called from the page, a few dozen times a second at most — the script
     /// already waits for a frame before it says anything.
-    func scrolled(to y: Double, of ceiling: Double, color: Color?) {
+    func scrolled(to y: Double, of ceiling: Double, color: Tint?) {
         reading = ceiling > 0 ? min(1, max(0, y / ceiling)) : 0
         if color != themeColor { themeColor = color }
         let delta = y - lastY
@@ -567,9 +630,16 @@ final class Tab: ObservableObject, Identifiable {
         failureCode = nil
         reading = 0
         lastY = 0
+        // A new address means a new page: drop the old tint now rather than
+        // wearing it until the new document's first scroll report arrives.
+        // The injected script calls tell() at document end, which sets the
+        // new colour (or nil for a transparent page) straight away.
+        themeColor = nil
         reader = false
         typing = false
         immersed = false
+        canFloat = false
+        clearHover()
         // Sent somewhere new, a sleeping tab is simply awake again — with
         // nothing of where it was before to bring back.
         pending = nil
@@ -577,6 +647,9 @@ final class Tab: ObservableObject, Identifiable {
         picture = nil
         cover = nil
         adoptIcon()
+        // Eager inset before the first load starts, so the first paint
+        // already carries it rather than waiting for the update cycle.
+        applyTopInsetNow()
         web.load(URLRequest(url: url))
     }
 
@@ -604,6 +677,7 @@ final class Tab: ObservableObject, Identifiable {
         reading = 0
         lastY = 0
         noisy = false
+        canFloat = false
         stale = false
         pull = nil
         // Loading about:blank here looked like letting the page go, and
@@ -626,6 +700,7 @@ final class Tab: ObservableObject, Identifiable {
         memory = built.interactionState
         self.picture = picture
         pending = url
+        canFloat = false
         stale = false
         pull = nil
         discard()
@@ -704,6 +779,8 @@ final class Tab: ObservableObject, Identifiable {
     /// accept the very next load, which is what a reload that looks like it
     /// did nothing actually was.
     func recoverFromCrash() {
+        canFloat = false
+        clearHover()
         guard let address else { return }
         failure = nil
         failureCode = nil
@@ -734,6 +811,10 @@ final class Tab: ObservableObject, Identifiable {
             }
             return
         }
+        // Eager inset before the load starts: `wake()` paths wait for the
+        // stage to take the view, and that wait is the last chance to have
+        // the inset present for the first paint rather than a later re-render.
+        applyTopInsetNow()
         // A tab that slept has its own history to go back to — the page, its
         // back list and its scroll position, in one. Anything else starts
         // from the address.
@@ -775,6 +856,7 @@ final class Tab: ObservableObject, Identifiable {
         // A view with no document behind an address: whatever emptied it, the
         // address is what to show, and reload alone would have nothing to do.
         if hollow, let address {
+            applyTopInsetNow()
             web.load(URLRequest(url: address))
             return
         }
@@ -805,6 +887,8 @@ final class Tab: ObservableObject, Identifiable {
         reader = false
         typing = false
         immersed = false
+        canFloat = false
+        clearHover()
         let state = memory
         memory = nil
         if let picture, let image = NSImage(data: picture) {
@@ -822,12 +906,48 @@ final class Tab: ObservableObject, Identifiable {
     /// the frame between the tab appearing and the page committing.
     func setAddressOptimistically(_ url: URL) {
         address = url
+        canFloat = false
         failure = nil
         failureCode = nil
         adoptIcon()
     }
 
     func touch() { touched = Date() }
+
+    /// The obscured top inset this tab's page should carry right now.
+    ///
+    /// Mirrors the stage's `topSafeInset` rule (see App.swift): 48 under the
+    /// overlay strip, 0 with the sidebar or immersed fullscreen. Tinted and
+    /// untinted alike take 48 — only the bar's material changes, never the
+    /// viewport geometry. Blank and sleeping tabs take 48 like any strip
+    /// state so loading or waking never shifts layout. Floating takes 0: the
+    /// floating window is chromeless and any inset offsets the fixed video.
+    /// The window level covers paths that reach the page without the flag.
+    var desiredTopInset: CGFloat {
+        if floating { return 0 }
+        if immersed { return 0 }
+        if let built, built.window?.level == .floating { return 0 }
+        let sidebar = (Store.settings.object(forKey: "sidebar") as? Bool)
+            ?? (Store.settings.string(forKey: "manner") == "side")
+        if sidebar { return 0 }
+        return Metrics.strip
+    }
+
+    /// Re-assert the strip inset on the built view, if there is one.
+    ///
+    /// Idempotent and cheap: the bridge clears legacy scroll padding only
+    /// when non-zero and forwards one `responds(to:)`-gated SPI call.
+    /// Main-thread by construction — `Tab` is `@MainActor` and every caller
+    /// (build, window attach, navigation commit/finish) runs there. Never
+    /// builds a view just to set it.
+    func applyTopInsetNow() {
+        guard let built else { return }
+        if floating || built.window?.level == .floating {
+            StageView.applyTopInset(0, to: built)
+        } else {
+            StageView.applyTopInset(desiredTopInset, to: built)
+        }
+    }
 
     /// True when the web view holds nothing — never loaded, or emptied —
     /// while the tab still names a page. The white page, in other words.
@@ -840,9 +960,11 @@ final class Tab: ObservableObject, Identifiable {
     /// Again from the network. A view that has lost its document is given
     /// the address back instead: there is nothing else for it to reload.
     func reload() {
+        clearHover()
         // A pin put down with ⌘W has no view left to reload; waking it is
         // the reload.
         guard !wake() else { return }
+        applyTopInsetNow()
         if hollow, !downloaded, let address {
             web.load(URLRequest(url: address))
         } else {
@@ -850,6 +972,14 @@ final class Tab: ObservableObject, Identifiable {
         }
     }
     func stop() { web.stopLoading() }
+
+    /// A click on the tab already showing scrolls its page back to the top,
+    /// the way iOS Safari does. Asleep or blank tabs hold no page, so there
+    /// is nothing to scroll and no view is built just to ask.
+    func scrollToTop() {
+        guard !isBlank, pending == nil else { return }
+        built?.evaluateJavaScript("window.scrollTo({top:0,behavior:'smooth'})")
+    }
     /// Straight through, every time. A page that has to be fetched again is
     /// fetched again — nothing is kept behind to make that look otherwise.
     func back() { web.goBack() }
@@ -875,6 +1005,8 @@ final class Tab: ObservableObject, Identifiable {
     private func discard() {
         watch = []
         ears.stop()
+        canFloat = false
+        clearHover()
         guard let web = built else { return }
         built = nil
         let controller = web.configuration.userContentController
@@ -883,10 +1015,13 @@ final class Tab: ObservableObject, Identifiable {
         controller.removeScriptMessageHandler(forName: FormRelay.name)
         controller.removeScriptMessageHandler(forName: ImageRelay.name)
         controller.removeScriptMessageHandler(forName: VideoRelay.name)
+        controller.removeScriptMessageHandler(forName: FloatRelay.name)
         controller.removeScriptMessageHandler(forName: StoreRelay.name)
+        controller.removeScriptMessageHandler(forName: LinkRelay.name)
         controller.removeAllUserScripts()
         web.onPull = nil
         web.onTouch = nil
+        web.onAttach = nil
         web.stopLoading()
         web.navigationDelegate = nil
         web.uiDelegate = nil
@@ -939,6 +1074,7 @@ final class PageView: WKWebView {
     /// What extensions added to the right-click menu, at the end of it.
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
         super.willOpenMenu(menu, with: event)
+        if EXTENSIONS_HIDDEN { return }
         guard #available(macOS 15.4, *),
               let tab = Extensions.shared.browser?.tabs.first(where: { $0.built === self })
         else { return }
@@ -953,10 +1089,43 @@ final class PageView: WKWebView {
     /// Told the moment the page is reached for — a click, a scroll — so the
     /// picture of a tab waking up never stands between you and the page.
     var onTouch: (() -> Void)?
+    /// Told when the view enters a window (stage attach, floating panel
+    /// attach). The tab re-asserts the strip inset here so the first paint in
+    /// the new window already carries it. Set by `Tab.build`, cleared on
+    /// `discard`; the floating level check inside `applyTopInsetNow` keeps
+    /// the floating zero-inset guarantee.
+    var onAttach: (() -> Void)?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        onAttach?()
+    }
 
     override func mouseDown(with event: NSEvent) {
         onTouch?()
         super.mouseDown(with: event)
+    }
+
+    // MARK: - side buttons
+
+    /// Smart-mouse back/forward. WebKit leaves otherMouseDown to the embedder:
+    /// with no override the press simply does nothing. Button 3 goes back,
+    /// button 4 goes forward — the AppKit numbering (left 0, right 1, middle
+    /// 2) every smart mouse reports through. Middle-click (2) and anything
+    /// else keep their existing road through super, so links, autoscroll,
+    /// context menus, selection and scrolling are untouched.
+    override func otherMouseDown(with event: NSEvent) {
+        onTouch?()
+        if event.buttonNumber == 3 { goBack(); return }
+        if event.buttonNumber == 4 { goForward(); return }
+        super.otherMouseDown(with: event)
+    }
+
+    /// Swallow the matching release so a handled press leaves nothing behind
+    /// for WebKit or the responder chain to read as something else.
+    override func otherMouseUp(with event: NSEvent) {
+        if event.buttonNumber == 3 || event.buttonNumber == 4 { return }
+        super.otherMouseUp(with: event)
     }
 
     // MARK: - keys the page didn't use
@@ -1262,17 +1431,11 @@ final class ScrollRelay: NSObject, WKScriptMessageHandler {
             rgb = (r, g, b)
         }
         MainActor.assumeIsolated {
-            var color: Color?
-            if let rgb {
-                // A tint darker than the ink it would sit behind would hide the
-                // tab names; wear only a tint that agrees with the theme.
-                let lum = 0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b
-                let darkAppearance = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-                if (lum < 128) == darkAppearance {
-                    color = Color(red: rgb.r / 255, green: rgb.g / 255, blue: rgb.b / 255)
-                }
-            }
-            tab?.scrolled(to: y, of: ceiling, color: color)
+            // Every opaque colour the page offers is worn: the tab text
+            // contrasts with it instead. Nil only when the page offered
+            // nothing usable (transparent / missing).
+            let tint: Tint? = rgb.map { Tint(bytes: $0.r, g: $0.g, b: $0.b) }
+            tab?.scrolled(to: y, of: ceiling, color: tint)
         }
     }
 
@@ -1294,6 +1457,13 @@ final class ScrollRelay: NSObject, WKScriptMessageHandler {
           var m = c.match(/[0-9]+/g);
           if (m && m.length >= 3) return [ +m[0], +m[1], +m[2] ];
           el = el.parentElement;
+        }
+        // The walk stops before <html>: a page that paints its ground there
+        // (transparent <body>) still offers an opaque colour worth wearing.
+        var rc = getComputedStyle(document.documentElement).backgroundColor;
+        if (rc.indexOf('rgba') !== 0 || parseFloat(rc.slice(rc.lastIndexOf(',') + 1)) !== 0) {
+          var rm = rc.match(/[0-9]+/g);
+          if (rm && rm.length >= 3) return [ +rm[0], +rm[1], +rm[2] ];
         }
         return null;
       }

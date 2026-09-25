@@ -98,7 +98,7 @@ extension Browser {
             guard let (data, _) = try? await URLSession.shared.data(from: url),
                   let image = NSImage(data: data)
             else {
-                announce("Couldn't copy that image")
+                announce("That image could not be copied")
                 return
             }
             NSPasteboard.general.clearContents()

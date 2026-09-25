@@ -7,11 +7,17 @@ struct ExtensionsPage: View {
     @ObservedObject var browser: Browser
 
     var body: some View {
-        if #available(macOS 15.4, *) {
+        // Hidden for the first public release: the section is gone from the
+        // Settings rail, and a stored "extensions" page just says so quietly.
+        if EXTENSIONS_HIDDEN {
+            Card {
+                Line("Extensions", "Extensions aren't available in this release.") { EmptyView() }
+            }
+        } else if #available(macOS 15.4, *) {
             Installer(browser: browser, extensions: .shared)
         } else {
             Card {
-                Line("Chrome extensions", "Need macOS 15.4 or later — the version whose WebKit can run them.") { EmptyView() }
+                Line("Chrome extensions", "Needs macOS 15.4 or later. That is the version whose WebKit can run them.") { EmptyView() }
             }
         }
     }
@@ -78,7 +84,7 @@ struct ExtensionsPage: View {
                 }
 
                 Card {
-                    Line("Load an unpacked extension", "A folder with a manifest.json — your own, or one exported from another browser. Reload picks up what you've changed in it since.") {
+                    Line("Load an unpacked extension", "A folder with a manifest.json. Yours, or one exported from another browser. Reload picks up what changed since.") {
                         Pill("Choose…") { extensions.installFolder() }
                     }
                 }
@@ -153,7 +159,7 @@ struct ExtensionsPage: View {
 
         private func detail(_ context: WKWebExtensionContext?) -> String {
             var parts = ["Version \(item.version)", item.fromStore ? "Chrome Web Store" : folder]
-            if item.enabled, context == nil { parts.append("couldn't start") }
+            if item.enabled, context == nil { parts.append("could not start") }
             if context?.overrideNewTabPageURL != nil, Store.settings.object(forKey: "extensions.newtab.\(item.id)") as? Bool == true {
                 parts.append("shows in new tabs")
             }
@@ -169,7 +175,8 @@ struct StoreOffer: View {
     @ObservedObject var browser: Browser
 
     var body: some View {
-        if #available(macOS 15.4, *), let tab = browser.active {
+        // Hidden for the first public release: no install bar on store pages.
+        if !EXTENSIONS_HIDDEN, #available(macOS 15.4, *), let tab = browser.active {
             Watch(tab: tab, extensions: .shared)
         }
     }

@@ -10,6 +10,11 @@ struct SatoriApp: App {
     /// Links from other apps, and the Dock icon.
     @NSApplicationDelegateAdaptor(Links.self) private var links
 
+    init() {
+        // Boot Sparkle (daily auto-checks + one background check on launch).
+        _ = UpdaterController.shared
+    }
+
     var body: some Scene {
         Window("Satori", id: "browser") {
             ContentView(browser: browser)
@@ -18,6 +23,18 @@ struct SatoriApp: App {
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1180, height: 780)
         .commands {
+            // Quit asks first. The button routes through NSApp.terminate so
+            // Cmd+Q, menu Quit and Dock Quit all land in
+            // Links.applicationShouldTerminate and share one dialog.
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") {
+                    UpdaterController.shared.checkForUpdates(nil)
+                }
+            }
+            CommandGroup(replacing: .appTermination) {
+                Button("Quit Satori") { NSApp.terminate(nil) }
+                    .keyboardShortcut("q")
+            }
             // One window. Tabs are the only kind of "new" there is.
             CommandGroup(replacing: .newItem) {
                 Button("New Tab") { browser.newTab() }
@@ -57,7 +74,7 @@ struct SatoriApp: App {
                     set: { _ in browser.toggleSidebar() }
                 ))
                 .keyboardShortcut("s", modifiers: [.command, .shift])
-                Picker("Tabs show", selection: Binding(
+                Picker("Tabs show as", selection: Binding(
                     get: { browser.prefs.glyph },
                     set: { browser.prefs.glyph = $0 }
                 )) {
@@ -126,7 +143,7 @@ struct SatoriApp: App {
                     .keyboardShortcut("m", modifiers: [.command, .shift])
             }
             CommandMenu("Bookmarks") {
-                Button("Add This Page") { browser.bookmarkCurrent() }
+                Button("Bookmark This Page") { browser.bookmarkCurrent() }
                     .keyboardShortcut("b", modifiers: [.command, .shift])
                     .disabled(browser.active?.isBlank ?? true)
                 Button("Show Bookmarks…") { browser.bookmarking = true }
@@ -188,7 +205,7 @@ private struct BookmarkTree: View {
                     if let kids = node.children, !kids.isEmpty {
                         BookmarkTree(nodes: kids, open: open)
                     } else {
-                        Text("Empty")
+                        Text("Nothing here")
                     }
                 }
             } else if let text = node.url, let url = URL(string: text) {
@@ -228,6 +245,7 @@ struct ContentView: View {
     @ObservedObject var browser: Browser
 
     @State private var keys: Any?
+    @State private var clicks: Any?
     @State private var window: NSWindow?
     @State private var resting: RestingLights?
 
@@ -250,15 +268,19 @@ struct ContentView: View {
                 }
 
                 VStack(spacing: 0) {
-                    // The strip's own height while the page starts below it;
-                    // nothing in the sidebar or full screen, where there is no
-                    // strip to leave room for.
+                    // Safari-Compact overlay: the page extends behind the 48pt
+                    // strip (`stripReserve` is 0) and WebKit obscured insets
+                    // (`topSafeInset`, 48) shift normal flow AND fixed/sticky
+                    // site headers below the bar while scrolled content slides
+                    // beneath the translucent material. The TabBar stays above
+                    // the page in the ZStack so hit-testing, DragStrip,
+                    // lights, tab layout and safe-area handling are unchanged.
                     Color.clear
-                        .frame(height: browser.prefs.sidebar || browser.active?.immersed == true ? 0 : Metrics.strip)
+                        .frame(height: stripReserve)
 
                     // One stage, always.
                     if let tab = browser.active {
-                        Page(tab: tab)
+                        Page(tab: tab, topInset: topSafeInset)
                             .overlay(alignment: .topTrailing) {
                                 if browser.finding {
                                     FindBar(browser: browser)
@@ -305,7 +327,7 @@ struct ContentView: View {
             }
             StoreOffer(browser: browser)
             if browser.veiling {
-                hint("Click anything to hide it   ⌘Z undo   esc done")
+                hint("Click to hide something   ⌘Z brings it back   esc done")
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
@@ -408,6 +430,7 @@ struct ContentView: View {
             .animation(Motion.settle, value: browser.reviewing)
         .onAppear {
             watchKeys()
+            watchClicks()
             browser.askFocus()
             // Addresses from other apps have somewhere to go from here on.
             Links.hand(to: browser)
@@ -422,7 +445,7 @@ struct ContentView: View {
     /// WebAuthn refuses to run on a document that isn't focused, and so do a
     /// number of paste and shortcut handlers pages install for themselves.
     private func handBack() {
-        guard !browser.fieldShowing, browser.editingTab == nil else { return }
+        guard !browser.fieldShowing else { return }
         DispatchQueue.main.async {
             guard let web = browser.active?.web, let window = web.window else { return }
             window.makeFirstResponder(web)
@@ -455,7 +478,7 @@ struct ContentView: View {
             Image(systemName: ask.wants == "microphone" ? "mic" : "video")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Palette.muted)
-            Text("\(ask.host) wants to use your \(ask.wants)")
+            Text("\(ask.host) asks for your \(ask.wants)")
                 .font(.system(size: 12.5))
                 .foregroundStyle(Palette.ink)
             Button { browser.allowCapture() } label: {
@@ -562,6 +585,48 @@ struct ContentView: View {
         browser.active?.immersed == true ? 0 : Metrics.pageInset
     }
 
+    /// How much vertical room the page leaves for the top strip.
+    ///
+    /// Always 0: Safari-Compact overlay in every state — the page extends
+    /// behind the 48pt strip whether the bar is tinted opaque or untinted
+    /// translucent. Content offset comes from WebKit obscured insets
+    /// (`topSafeInset`), which shift normal flow AND fixed/sticky headers
+    /// below the bar while scrolled content slides beneath it. Keeping the
+    /// reserve constant (instead of 48 tinted / 0 untinted) means tint flips
+    /// change only the bar's material, never the viewport geometry — no
+    /// layout jumps when a page reports a new theme colour or Adaptive is
+    /// toggled. Materials, tint computation and the Adaptive gate are
+    /// untouched. The spacer is kept (at 0 height) as the layout anchor.
+    ///
+    /// Rules: 0 everywhere — normal, tinted, untinted, blank, sleeping,
+    /// floating, sidebar, immersed. Sidebar and immersed have no strip; the
+    /// rest share one overlay geometry so loading, waking, floating home
+    /// and tint transitions never shift layout.
+    ///
+    /// Reduce Transparency keeps working via the material's own default
+    /// fallback (opaque fill).
+    private var stripReserve: CGFloat { 0 }
+
+    /// Safari-Compact obscured top inset for the page (see StageView).
+    ///
+    /// 48pt whenever the top strip is visible (tinted opaque or untinted
+    /// translucent alike): normal content starts below the bar, scrolled
+    /// content slides beneath it, and viewport-anchored fixed/sticky site
+    /// headers (e.g. Amazon's) stop at the bar's bottom edge instead of
+    /// hiding under it. Applied via WKWebView `_setTopContentInset:`
+    /// (obscuredContentInsets, `responds(to:)`-gated); the legacy
+    /// NSScrollView `contentInsets.top` path stays retired at 0 to avoid a
+    /// double offset. Sidebar (no strip) and immersed fullscreen (no strip)
+    /// take 0; blank/sleeping/floating take 48 like any strip state so
+    /// loading or waking never shifts layout (the floating *window* itself
+    /// clears to 0 on lift — see Float.lift — and restores on landing).
+    /// No CSS is injected, so scroll, zoom, find and reader mode keep their
+    /// semantics.
+    private var topSafeInset: CGFloat {
+        if browser.prefs.sidebar || browser.active?.immersed == true { return 0 }
+        return Metrics.strip
+    }
+
     /// Put the resting circles in the title bar, exactly over the buttons,
     /// for when the app is behind: macOS's own resting buttons come out
     /// nearly white on a light window, so these cover them until it's back.
@@ -598,6 +663,12 @@ struct ContentView: View {
         // The strip does the dragging, so the page underneath can't be grabbed
         // by accident while selecting text.
         window.isMovableByWindowBackground = false
+        // The transparent title bar's container is 48pt tall, full-width, and
+        // kept above the content (below) so the traffic lights paint over it.
+        // Left movable, AppKit starts a native title-bar drag on any press-drag
+        // in that band — including on a tab — which beats the SwiftUI reorder
+        // gesture. The custom DragStrip stays the sole mover for empty areas.
+        window.isMovable = false
         // Where you left it, at the size you left it. A test run keeps its
         // own: the name lives in the app's standard defaults, which every
         // copy shares, and a probe resized for a test once changed the size
@@ -646,6 +717,37 @@ struct ContentView: View {
         }
     }
 
+    /// Side buttons window-wide, including over the page: this monitor runs
+    /// before the responder chain so it owns buttons 3/4 everywhere in the
+    /// main window and sends them to the same back()/forward() PageView
+    /// answers with on its own path. Only buttons 3 (back) and 4 (forward)
+    /// are taken; middle-click (2) and anything else pass through untouched.
+    /// While a native text field is being edited the press is left alone so
+    /// typing is never interrupted; menus likewise keep their events.
+    private func watchClicks() {
+        guard clicks == nil else { return }
+        clicks = NSEvent.addLocalMonitorForEvents(matching: [.otherMouseDown, .otherMouseUp]) { event in
+            takeClick(event)
+        }
+    }
+
+    private func takeClick(_ event: NSEvent) -> NSEvent? {
+        guard event.buttonNumber == 3 || event.buttonNumber == 4 else { return event }
+        // Main browser window only: side presses in the floating video window
+        // keep their events, so they never navigate the main tab.
+        if let target = event.window, let main = window ?? Links.window, target !== main { return event }
+        if let win = event.window ?? NSApp.keyWindow,
+           let first = win.firstResponder,
+           first is NSText || first is NSTextView { return event }
+        if event.type == .otherMouseDown {
+            // The same touch PageView reports on its own path, so the sleep
+            // cover comes off identically whichever owns the press.
+            browser.active?.uncover()
+            if event.buttonNumber == 3 { browser.back() } else { browser.forward() }
+        }
+        return nil
+    }
+
     private func take(_ event: NSEvent) -> Bool {
         // A combo being taught goes straight to the recorder: teaching one
         // must never fire one.
@@ -656,10 +758,6 @@ struct ContentView: View {
         // Escape puts the page back. On a blank tab there is no page to put
         // back, so it belongs to whatever else wants it.
         if event.keyCode == 53 {
-            if browser.editingTab != nil {
-                browser.cancelTabEdit()
-                return true
-            }
             if browser.tuning {
                 browser.tuning = false
                 return true
@@ -714,7 +812,6 @@ struct ContentView: View {
         // is what there is to move through, and Return takes whatever the walk
         // landed on.
         if event.keyCode == 48, !flags.contains(.command), !flags.contains(.option) {
-            if browser.editingTab != nil { return true }
             // Filling something in on the page: the key belongs to the field,
             // which may well be offering a completion to take with it.
             if !browser.fieldShowing, browser.active?.typing == true { return false }

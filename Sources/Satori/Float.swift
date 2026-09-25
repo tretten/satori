@@ -86,6 +86,13 @@ final class Float {
         page.frame = ground.bounds
         page.autoresizingMask = [.width, .height]
         ground.addSubview(page)
+        // Any obscured top inset lives on the WKWebView itself
+        // (`_setTopContentInset:` → obscuredContentInsets), so it travels with
+        // the page and would offset the fixed video in this chromeless window
+        // — a black band across the top. Clearing once here removes it. The
+        // stage skips floating pages from here on and restores the strip value
+        // (48) on landing.
+        StageView.applyTopInset(0, to: page)
 
         let controls = Controls(frame: ground.bounds)
         controls.autoresizingMask = [.width, .height]
@@ -308,9 +315,14 @@ final class Float {
 
         override func mouseDown(with event: NSEvent) {
             guard let window else { return }
+            // Caught mid-flight: it stops where it is, under the hand.
+            land()
             grab = NSEvent.mouseLocation
             origin = window.frame
             stretching = atCorner(convert(event.locationInWindow, from: nil))
+            moved = false
+            speed = .zero
+            last = (grab, event.timestamp)
         }
 
         override func mouseDragged(with event: NSEvent) {
@@ -318,12 +330,95 @@ final class Float {
             let now = NSEvent.mouseLocation
             let dx = now.x - grab.x
             let dy = now.y - grab.y
+            moved = true
+
+            // Smoothed, so one jittery event at the end can't decide the throw.
+            let dt = event.timestamp - last.at
+            if dt > 0 {
+                let vx = (now.x - last.spot.x) / dt
+                let vy = (now.y - last.spot.y) / dt
+                speed = CGVector(dx: speed.dx * 0.3 + vx * 0.7, dy: speed.dy * 0.3 + vy * 0.7)
+            }
+            last = (now, event.timestamp)
 
             guard stretching else {
                 window.setFrameOrigin(NSPoint(x: origin.minX + dx, y: origin.minY + dy))
                 return
             }
             resize(to: origin.width + dx, from: origin)
+        }
+
+        override func mouseUp(with event: NSEvent) {
+            guard moved, !stretching, let window else { return }
+            // A hand that stopped before letting go threw nothing.
+            if event.timestamp - last.at > 0.05 { speed = .zero }
+            fling(window)
+        }
+
+        // MARK: - going to a corner
+
+        private var moved = false
+        private var speed = CGVector.zero
+        private var last: (spot: NSPoint, at: TimeInterval) = (.zero, 0)
+        private var flight: Timer?
+
+        /// Where a throw would come to rest, the way a scroll glides out
+        /// (Apple's projection, deceleration 0.998), then the nearest corner
+        /// of the screen to that — not to where the hand let go. A flick
+        /// crosses the screen; a gentle drop stays near.
+        private func fling(_ window: NSWindow) {
+            let frame = window.frame
+            let screen = (window.screen ?? NSScreen.main)?.visibleFrame ?? frame
+            func project(_ v: CGFloat) -> CGFloat { v / 1000 * 0.998 / (1 - 0.998) }
+            let ahead = NSPoint(x: frame.midX + project(speed.dx), y: frame.midY + project(speed.dy))
+
+            let margin: CGFloat = 24
+            let left = screen.minX + margin
+            let right = screen.maxX - frame.width - margin
+            let bottom = screen.minY + margin
+            let top = screen.maxY - frame.height - margin
+            let to = NSPoint(
+                x: ahead.x < screen.midX ? left : right,
+                y: ahead.y < screen.midY ? bottom : top
+            )
+
+            if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+                window.setFrameOrigin(to)
+                return
+            }
+            glide(window, to: to, velocity: speed)
+        }
+
+        /// A critically damped spring, response 0.4 s — what Apple's own
+        /// picture-in-picture moves with. It leaves at the speed the hand let
+        /// go with, so there is no seam between dragging and gliding, and it
+        /// settles without overshoot.
+        private func glide(_ window: NSWindow, to: NSPoint, velocity: CGVector) {
+            let from = window.frame.origin
+            let omega = 2 * CGFloat.pi / 0.4
+            let begun = CACurrentMediaTime()
+            func axis(_ x0: CGFloat, _ v0: CGFloat, _ t: CGFloat) -> CGFloat {
+                (x0 + (v0 + omega * x0) * t) * exp(-omega * t)
+            }
+            flight = Timer.scheduledTimer(withTimeInterval: 1 / 120, repeats: true) { [weak self, weak window] _ in
+                MainActor.assumeIsolated {
+                    guard let self, let window else { return self?.land() ?? () }
+                    let t = CGFloat(CACurrentMediaTime() - begun)
+                    let x = axis(from.x - to.x, velocity.dx, t)
+                    let y = axis(from.y - to.y, velocity.dy, t)
+                    if t > 1.2 || (abs(x) < 0.5 && abs(y) < 0.5 && t > 0.1) {
+                        window.setFrameOrigin(to)
+                        self.land()
+                        return
+                    }
+                    window.setFrameOrigin(NSPoint(x: to.x + x, y: to.y + y))
+                }
+            }
+        }
+
+        private func land() {
+            flight?.invalidate()
+            flight = nil
         }
 
         /// Two fingers on the trackpad move the window. There is nothing to
@@ -336,6 +431,7 @@ final class Float {
         /// in the frame, so the window can be pushed as far as the screen goes.
         override func scrollWheel(with event: NSEvent) {
             guard let window else { return }
+            land()
             // Only while fingers are actually down. Letting the glide continue
             // would fling the pointer across the screen after them.
             guard event.momentumPhase == [] else { return }
@@ -370,6 +466,7 @@ final class Float {
 
         override func magnify(with event: NSEvent) {
             guard let window else { return }
+            land()
             if event.phase == .began { pinching = 0 }
             pinching += event.magnification
 
@@ -483,23 +580,120 @@ private final class Panel: NSPanel {
 }
 
 enum Isolate {
+    /// A video worth floating: playing, not ended, a frame to show. Reads `v`.
+    static let live = "(!v.paused && !v.ended && v.readyState >= 2)"
+
+    /// Pinned inline on the floated video and undone on landing.
+    static let videoStyle = """
+    {'position': 'fixed', 'top': '0', 'left': '0', 'width': '100vw', 'height': '100vh',
+     'margin': '0', 'padding': '0', 'border': '0', 'max-width': 'none', 'max-height': 'none',
+     'object-fit': 'contain', 'object-position': 'center center', 'transform': 'none',
+     'animation': 'none', 'transition': 'none', 'visibility': 'visible', 'z-index': '2147483647'}
+    """
+
+    /// Pinned on every ancestor of the floated video. A transformed, filtered
+    /// or contained ancestor re-anchors position:fixed to itself; a clipping
+    /// one (YouTube's #movie_player sits 56pt down, below the masthead, with
+    /// overflow:hidden) still clips the fixed video in WebKit's compositor.
+    /// Either way the top of the window shows the black page as a band.
+    static let ancestorStyle = """
+    {'transform': 'none', 'filter': 'none', 'perspective': 'none', 'will-change': 'auto',
+     'backdrop-filter': 'none', 'contain': 'none', 'container-type': 'normal',
+     'translate': 'none', 'rotate': 'none', 'scale': 'none', 'animation': 'none',
+     'transition': 'none', 'overflow': 'visible', 'clip-path': 'none'}
+    """
+
     /// Everything but the video, out of the way. Visibility is inherited, so
     /// hiding the body and turning it back on for the video alone leaves the
     /// player's own machinery running untouched — which is what keeps the
     /// stream alive where cutting the DOM about would kill it.
     static let on = """
     (function () {
-      var videos = document.querySelectorAll('video');
-      var best = null, area = 0;
-      for (var i = 0; i < videos.length; i++) {
-        var v = videos[i];
-        if (v.paused || v.ended || v.readyState < 2) continue;
-        var box = v.getBoundingClientRect();
-        if (box.width * box.height >= area) { area = box.width * box.height; best = v; }
+      // Inline `!important` beats every site stylesheet, including player
+      // rules built on IDs and the player's own inline styles.
+      var videoStyle = \(videoStyle), ancestorStyle = \(ancestorStyle);
+      function pin(el, style) {
+        for (var p in style) el.style.setProperty(p, style[p], 'important');
       }
-      if (!best) return 'none';
+      function unpin(el, style) {
+        for (var p in style) { try { el.style.removeProperty(p); } catch (e) {} }
+      }
+      function pinVideo(v) { if (v) pin(v, videoStyle); }
+      function pinAncestors(v) {
+        unpinAncestors();
+        if (!v) return;
+        var chain = [];
+        for (var e = v.parentElement; e && e !== document.documentElement; e = e.parentElement) {
+          pin(e, ancestorStyle);
+          chain.push(e);
+        }
+        window.__satoriPinnedAncestors = chain;
+      }
+      function unpinAncestors() {
+        (window.__satoriPinnedAncestors || []).forEach(function (e) { unpin(e, ancestorStyle); });
+        window.__satoriPinnedAncestors = [];
+      }
+      function hideChrome(v) {
+        unhideChrome();
+        if (!v || !document.body) return;
+        var chain = [];
+        var c = v;
+        while (c) {
+          chain.push(c);
+          if (c === document.body) break;
+          c = c.parentElement;
+        }
+        var hidden = [];
+        var kids = document.body.children;
+        for (var i = 0; i < kids.length; i++) {
+          var k = kids[i];
+          var tag = (k.tagName || '').toLowerCase();
+          if (tag === 'script' || tag === 'style') continue;
+          if (chain.indexOf(k) >= 0) continue;
+          try { k.style.setProperty('display', 'none', 'important'); hidden.push(k); } catch (e2) {}
+        }
+        window.__satoriHiddenChrome = hidden;
+      }
+      function unhideChrome() {
+        var list = window.__satoriHiddenChrome || [];
+        for (var i = 0; i < list.length; i++) {
+          try { list[i].style.removeProperty('display'); } catch (e) {}
+        }
+        window.__satoriHiddenChrome = [];
+      }
+      function bestPlaying() {
+        var videos = document.querySelectorAll('video');
+        var best = null, area = 0;
+        for (var i = 0; i < videos.length; i++) {
+          var v = videos[i];
+          if (!\(live)) continue;
+          var box = v.getBoundingClientRect();
+          if (box.width * box.height >= area) { area = box.width * box.height; best = v; }
+        }
+        return best;
+      }
+      function fullPin(v) {
+        if (!v) return;
+        var prev = document.querySelector('[data-satori-float]');
+        if (prev && prev !== v) {
+          unpin(prev, videoStyle);
+          try { prev.removeAttribute('data-satori-float'); } catch (e) {}
+        }
+        try { v.setAttribute('data-satori-float', ''); } catch (e) {}
+        pinVideo(v);
+        pinAncestors(v);
+        hideChrome(v);
+      }
+      window.__satoriPinVideo = pinVideo;
+      window.__satoriPinAncestors = pinAncestors;
+      window.__satoriHideChrome = hideChrome;
+      window.__satoriBestPlaying = bestPlaying;
+      window.__satoriFullPin = fullPin;
 
-      best.setAttribute('data-satori-float', '');
+      var best = bestPlaying();
+      if (!best) return 'none';
+      fullPin(best);
+
       var sheet = document.getElementById('office-float');
       if (!sheet) {
         sheet = document.createElement('style');
@@ -508,14 +702,17 @@ enum Isolate {
       }
       sheet.textContent = [
         'html.satori-floating, html.satori-floating body {',
-        'background:#000 !important; overflow:hidden !important; margin:0 !important}',
+        'background:#000 !important; overflow:hidden !important; margin:0 !important; padding:0 !important}',
         'html.satori-floating body > * { visibility:hidden !important }',
         'html.satori-floating [data-satori-float] {',
         'visibility:visible !important; position:fixed !important;',
-        'left:0 !important; top:0 !important; right:0 !important; bottom:0 !important;',
+        'left:0 !important; top:0 !important;',
         'width:100vw !important; height:100vh !important;',
+        'margin:0 !important; padding:0 !important; border:0 !important;',
         'max-width:none !important; max-height:none !important;',
-        'object-fit:contain !important; z-index:2147483647 !important}',
+        'object-fit:contain !important; object-position:center center !important;',
+        'transform:none !important; animation:none !important; transition:none !important;',
+        'z-index:2147483647 !important}',
         // The player's own controls would sit under ours, and two sets of
         // buttons on one small window is one set too many.
         'html.satori-floating [data-satori-float]::-webkit-media-controls {',
@@ -532,25 +729,53 @@ enum Isolate {
       // black rectangle, and it is not an orphaned window at all.
       //
       // So the mark is put back on whatever is playing now, four times a
-      // second, for as long as the page is out.
+      // second, for as long as the page is out. The pin is re-applied each
+      // tick too: the player can move the node to a new container (new
+      // ancestors) or rewrite its style without dropping the mark.
       clearInterval(window.__satoriFloatWatch);
       window.__satoriFloatWatch = setInterval(function () {
-        if (document.querySelector('[data-satori-float]')) return;
-        var again = null, most = 0;
-        var all = document.querySelectorAll('video');
-        for (var j = 0; j < all.length; j++) {
-          var one = all[j];
-          if (one.paused || one.ended || one.readyState < 2) continue;
-          var shape = one.getBoundingClientRect();
-          if (shape.width * shape.height >= most) {
-            most = shape.width * shape.height;
-            again = one;
-          }
+        var marked = document.querySelector('[data-satori-float]');
+        if (marked) {
+          try {
+            window.__satoriPinVideo(marked);
+            window.__satoriPinAncestors(marked);
+            window.__satoriHideChrome(marked);
+          } catch (e) {}
+          try {
+            var r = marked.getBoundingClientRect();
+            if (r && r.top > 2) {
+              var best = window.__satoriBestPlaying();
+              if (best) window.__satoriFullPin(best);
+            }
+          } catch (e) {}
+          return;
         }
-        if (again) again.setAttribute('data-satori-float', '');
+        var again = null;
+        try { again = window.__satoriBestPlaying(); } catch (e) {}
+        if (again) {
+          try { window.__satoriFullPin(again); } catch (e) {}
+        }
       }, 250);
 
       return 'floating';
+    })();
+    """
+
+    /// Whether anything on the page could be floated right now. The same
+    /// practical test as `on` — a video that is playing, not ended, and
+    /// loaded enough to show a frame — without touching the DOM: no marks,
+    /// no stylesheet, no watch interval. The tab pill reads this through
+    /// `Tab.canFloat` so the pop-out icon only appears when it would work.
+    static let probe = """
+    (function () {
+      try {
+        var videos = document.querySelectorAll('video');
+        for (var i = 0; i < videos.length; i++) {
+          var v = videos[i];
+          if (\(live)) return true;
+        }
+        return false;
+      } catch (e) { return false; }
     })();
     """
 
@@ -608,12 +833,94 @@ enum Isolate {
 
       clearInterval(window.__satoriFloatWatch);
       window.__satoriFloatWatch = null;
+      try {
+        var hidden = window.__satoriHiddenChrome || [];
+        for (var h = 0; h < hidden.length; h++) {
+          try { hidden[h].style.removeProperty('display'); } catch (e) {}
+        }
+      } catch (e) {}
+      window.__satoriHiddenChrome = [];
       document.documentElement.classList.remove('satori-floating');
       var sheet = document.getElementById('office-float');
       if (sheet) sheet.textContent = '';
+      // Undo the inline pinning from `on`.
+      var videoStyle = \(videoStyle), ancestorStyle = \(ancestorStyle);
+      (window.__satoriPinnedAncestors || []).forEach(function (e) {
+        for (var p in ancestorStyle) { try { e.style.removeProperty(p); } catch (x) {} }
+      });
+      window.__satoriPinnedAncestors = [];
       var video = document.querySelector('[data-satori-float]');
-      if (video) video.removeAttribute('data-satori-float');
+      if (video) {
+        for (var p in videoStyle) { try { video.style.removeProperty(p); } catch (e) {} }
+        video.removeAttribute('data-satori-float');
+      }
+      window.__satoriPinVideo = null;
+      window.__satoriPinAncestors = null;
+      window.__satoriHideChrome = null;
+      window.__satoriBestPlaying = null;
+      window.__satoriFullPin = null;
       return 'landed';
     })();
     """
 }
+
+/// Tells its tab when a floatable video comes or goes, so the tab pill can
+/// show the pop-out icon only while floating would actually work.
+///
+/// Same criteria as `Isolate.on`/`Isolate.probe`, reported on media and DOM
+/// events rather than polled: play, pause, ended, loads, and nodes arriving
+/// or leaving. Main frame only, matching what a float attempt would find.
+final class FloatRelay: NSObject, WKScriptMessageHandler {
+    static let name = "satoriFloat"
+
+    weak var tab: Tab?
+
+    static let watch = """
+    (function () {
+      if (window.__satoriFloat) return;
+      window.__satoriFloat = true;
+      var last = null;
+      function check() {
+        try {
+          var ok = false;
+          var videos = document.querySelectorAll('video');
+          for (var i = 0; i < videos.length; i++) {
+            var v = videos[i];
+            if (\(Isolate.live)) { ok = true; break; }
+          }
+          if (ok !== last) {
+            last = ok;
+            window.webkit.messageHandlers.satoriFloat.postMessage({ floatable: ok });
+          }
+        } catch (e) {}
+      }
+      function soon() { requestAnimationFrame(function () { check(); }); }
+      ['play', 'pause', 'ended', 'emptied', 'loadeddata', 'canplay', 'seeked'].forEach(function (n) {
+        document.addEventListener(n, soon, true);
+      });
+      var delayed = null;
+      new MutationObserver(function () {
+        if (delayed) return;
+        delayed = setTimeout(function () { delayed = null; check(); }, 300);
+      }).observe(document.documentElement, { childList: true, subtree: true });
+      if (document.readyState === 'complete') { check(); }
+      else { window.addEventListener('load', check); }
+      setTimeout(check, 700);
+      setTimeout(check, 2200);
+    })();
+    """
+
+    func userContentController(
+        _ controller: WKUserContentController,
+        didReceive message: WKScriptMessage
+    ) {
+        guard let body = message.body as? [String: Any],
+              let ok = body["floatable"] as? Bool
+        else { return }
+        MainActor.assumeIsolated { [weak self] in
+            guard let self, let tab else { return }
+            tab.setFloatAvailability(ok)
+        }
+    }
+}
+

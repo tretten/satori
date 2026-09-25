@@ -1,4 +1,3 @@
-import Security
 import SwiftUI
 
 // Everything there is to set, in one observable place.
@@ -32,12 +31,16 @@ final class Preferences: ObservableObject {
     @Published var bench: Bool {
         didSet { store.set(bench, forKey: "bench") }
     }
-    /// Light, dark, or the Mac's own.
+    /// Dark, light, or the Mac's own.
     @Published var look: Look {
         didSet {
             store.set(look.rawValue, forKey: "look")
             look.apply()
         }
+    }
+    /// Whether the top bar takes the colour of the page. On unless turned off.
+    @Published var adaptive: Bool {
+        didSet { store.set(adaptive, forKey: "adaptive") }
     }
     /// Titles down the left instead of across the top.
     @Published var sidebar: Bool {
@@ -59,31 +62,19 @@ final class Preferences: ObservableObject {
     @Published var shielded: Bool {
         didSet { store.set(shielded, forKey: "shield") }
     }
-    /// Whether sites may ask for a passkey here. Off sends them to the
-    /// password instead — the only thing that works in a build without
-    /// Apple's browser entitlement.
-    @Published var passkeys: Bool {
-        didSet { store.set(passkeys, forKey: "passkeys") }
-    }
-    /// Whether this build can actually do them: signed with the entitlement,
-    /// its profile embedded. Fixed for the life of the process.
-    let passkeysPossible: Bool
-
-    /// Asked of the running process's own signature, which is the only thing
-    /// that decides it — a profile file in the bundle proves nothing on its
-    /// own, and an ad-hoc build has neither.
-    static var entitledToPasskeys: Bool {
-        guard let task = SecTaskCreateFromSelf(nil) else { return false }
-        let value = SecTaskCopyValueForEntitlement(
-            task, "com.apple.developer.web-browser.public-key-credential" as CFString, nil
-        )
-        return (value as? Bool) == true
-    }
     @Published var downloads: URL {
         didSet { store.set(downloads.path, forKey: "downloads") }
     }
     @Published var asksWhereToSave: Bool {
         didSet { store.set(asksWhereToSave, forKey: "downloads.ask") }
+    }
+    /// Check for updates on its own, every day. Off means only when asked,
+    /// through the button below it. Takes effect without a restart.
+    @Published var automaticallyChecksForUpdates: Bool {
+        didSet {
+            store.set(automaticallyChecksForUpdates, forKey: UpdaterController.automaticChecksKey)
+            UpdaterController.shared.setAutomaticallyChecksForUpdates(automaticallyChecksForUpdates)
+        }
     }
     /// Offer to keep a password the first time a site sees it.
     @Published var savesPasswords: Bool {
@@ -106,7 +97,7 @@ final class Preferences: ObservableObject {
             Preferences.tellWebKit(autocorrect: autocorrect)
         }
     }
-    /// Words that aren't a place go here. Google unless asked otherwise.
+    /// Words that aren't a place go here. DuckDuckGo unless asked otherwise.
     @Published var engine: Engine {
         didSet { store.set(engine.rawValue, forKey: "engine") }
     }
@@ -127,6 +118,7 @@ final class Preferences: ObservableObject {
         bench = store.bool(forKey: "bench")
         let chosen = store.string(forKey: "look").flatMap(Look.init) ?? .light
         look = chosen
+        adaptive = store.object(forKey: "adaptive") as? Bool ?? true
         // Before the first window, and not deferred: the window that is about
         // to be made should be made in the right appearance.
         NSApp.appearance = chosen.appearance
@@ -137,20 +129,6 @@ final class Preferences: ObservableObject {
         glyph = store.string(forKey: "glyph").flatMap(Glyph.init) ?? .icons
         sleepsTabs = store.object(forKey: "tabs.sleep") as? Bool ?? true
         shielded = store.object(forKey: "shield") as? Bool ?? true
-        // Offered by default only in a build that can actually do them —
-        // one with Apple's browser entitlement and its profile embedded. A
-        // choice made while they couldn't work is not a choice about them:
-        // the first run of a build that can offers them, whatever was set
-        // before; from then on the switch is the person's.
-        let entitled = Preferences.entitledToPasskeys
-        passkeysPossible = entitled
-        if entitled, !store.bool(forKey: "passkeys.entitled") {
-            passkeys = true
-            store.set(true, forKey: "passkeys")
-        } else {
-            passkeys = store.object(forKey: "passkeys") as? Bool ?? entitled
-        }
-        store.set(entitled, forKey: "passkeys.entitled")
         // A test run downloads into its own folder: ~/Downloads would have
         // macOS stop it to ask for access, with a dialog on the screen of
         // whoever is working beside it.
@@ -161,6 +139,7 @@ final class Preferences: ObservableObject {
             : (store.string(forKey: "downloads")).map { URL(fileURLWithPath: $0) }
                 ?? FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
         asksWhereToSave = store.object(forKey: "downloads.ask") as? Bool ?? true
+        automaticallyChecksForUpdates = store.object(forKey: UpdaterController.automaticChecksKey) as? Bool ?? true
         savesPasswords = store.object(forKey: "passwords.save") as? Bool ?? true
         fillsPasswords = store.object(forKey: "passwords.fill") as? Bool ?? true
         // Anyone who already has a session was here before the welcome
@@ -170,7 +149,7 @@ final class Preferences: ObservableObject {
         autocorrect = corrects
         // Before the first web view exists: WebKit reads these once.
         Preferences.tellWebKit(autocorrect: corrects)
-        engine = Engine(rawValue: store.string(forKey: "engine") ?? "") ?? .google
+        engine = Engine(rawValue: store.string(forKey: "engine") ?? "") ?? .duckduckgo
         shortcutOverrides = store.dictionary(forKey: "shortcuts") as? [String: String] ?? [:]
     }
 

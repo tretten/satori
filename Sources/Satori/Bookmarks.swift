@@ -276,7 +276,7 @@ struct BookmarkOutline: View {
                     // infer its own opaque return type from its own body.
                     AnyView(rows(kids, depth: depth + 1))
                 } else {
-                    Text("Empty")
+                    Text("Nothing here")
                         .font(.system(size: 12))
                         .foregroundStyle(Palette.faint)
                         .padding(.leading, indent(depth + 1) + 26)

@@ -20,7 +20,7 @@ struct Omnibox: View {
             if over {
                 // The page is still there, just out of the way.
                 Rectangle()
-                    .fill(Palette.ground.opacity(0.74))
+                    .fill(Palette.ground.opacity(0.96))
                     .ignoresSafeArea()
                     .onTapGesture { browser.dismiss() }
                     .transition(.opacity)
@@ -115,23 +115,19 @@ struct Omnibox: View {
 
         @State private var hovering = false
 
+        /// The site icon already on disk, and nothing fetched. Reading the
+        /// cache here keeps the suggestion array and the keyboard walk order
+        /// exactly as `Browser.guess()` built them: row rendering never
+        /// reorders, refetches, or writes.
+        private var cachedIcon: NSImage? {
+            guard offer.kind != .search else { return nil }
+            guard let host = offer.url.host()?.lowercased(), !host.isEmpty else { return nil }
+            return Favicons.shared.cached(host)
+        }
+
         var body: some View {
             HStack(spacing: 10) {
-                switch offer.kind {
-                case .search:
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(Palette.muted)
-                case .open:
-                    // Already open: naming it takes you back to it rather than
-                    // opening a second copy.
-                    Circle()
-                        .fill(Palette.ink.opacity(0.55))
-                        .frame(width: 5, height: 5)
-                        .padding(.horizontal, 2)
-                default:
-                    EmptyView()
-                }
+                leading
                 Text(offer.key)
                     .font(.system(size: 13))
                     .foregroundStyle(Palette.ink)
@@ -145,6 +141,16 @@ struct Omnibox: View {
                         .truncationMode(.tail)
                 }
                 Spacer(minLength: 0)
+                // Already open: naming it takes you back to it rather than
+                // opening a second copy. The dot carries that meaning, so it
+                // is kept; it moves to the trailing edge so the leading
+                // favicon column stays aligned across all rows.
+                if offer.kind == .open {
+                    Circle()
+                        .fill(Palette.ink.opacity(0.55))
+                        .frame(width: 5, height: 5)
+                        .accessibilityHidden(true)
+                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 9)
@@ -159,6 +165,49 @@ struct Omnibox: View {
             }
             .onHover { hovering = $0 }
             .animation(Motion.quick, value: hovering)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(accessibilityName)
+        }
+
+        /// Leading 16px slot, aligned across rows. Search rows keep the
+        /// magnifier; every URL row (visited, known, open) shows the cached
+        /// favicon when present and a `globe` placeholder otherwise. Bitmaps
+        /// are never recolored.
+        @ViewBuilder
+        private var leading: some View {
+            switch offer.kind {
+            case .search:
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Palette.muted)
+                    .frame(width: 16, height: 16)
+            default:
+                if let icon = cachedIcon {
+                    Image(nsImage: icon)
+                        .resizable()
+                        .interpolation(.high)
+                        .frame(width: 16, height: 16)
+                        .clipShape(RoundedRectangle(cornerRadius: 3.5, style: .continuous))
+                } else {
+                    Image(systemName: "globe")
+                        .font(.system(size: 12, weight: .regular))
+                        .foregroundStyle(Palette.muted)
+                        .frame(width: 16, height: 16)
+                }
+            }
+        }
+
+        private var accessibilityName: String {
+            switch offer.kind {
+            case .search:
+                return "Search for \(offer.key)"
+            case .open:
+                return offer.title.isEmpty
+                    ? "\(offer.key), already open"
+                    : "\(offer.key), \(offer.title), already open"
+            default:
+                return offer.title.isEmpty ? offer.key : "\(offer.key), \(offer.title)"
+            }
         }
     }
 }
@@ -188,7 +237,7 @@ struct AddressField: NSViewRepresentable {
         // SwiftUI picks its own colour for a placeholder, and on a pale ground
         // that colour was near-white.
         field.placeholderAttributedString = NSAttributedString(
-            string: "Enter a web address",
+            string: "Type an address",
             attributes: [
                 .font: NSFont.systemFont(ofSize: 15.5),
                 .foregroundColor: NSColor(Palette.ink.opacity(0.3)),
@@ -218,8 +267,13 @@ struct AddressField: NSViewRepresentable {
 
         if coordinator.answered != browser.focusRequest {
             coordinator.answered = browser.focusRequest
+            coordinator.focusGeneration += 1
+            let generation = coordinator.focusGeneration
             DispatchQueue.main.async {
-                field.window?.makeFirstResponder(field)
+                guard generation == coordinator.focusGeneration else { return }
+                guard field.window != nil else { return }
+                guard field.window?.makeFirstResponder(field) == true else { return }
+                coordinator.inputScope.begin(for: field)
                 guard let editor = field.currentEditor() as? NSTextView else { return }
                 // The system paints selected text as a block of accent colour,
                 // which over this pale field is the loudest thing in the
@@ -233,9 +287,19 @@ struct AddressField: NSViewRepresentable {
         }
     }
 
+    static func dismantleNSView(_ field: NSTextField, coordinator: Coordinator) {
+        coordinator.focusGeneration += 1
+        coordinator.inputScope.end()
+    }
+
     final class Coordinator: NSObject, NSTextFieldDelegate {
         var browser: Browser
         var answered = -1
+        /// Borrows the English layout while the field holds the caret.
+        let inputScope = AddressInputScope()
+        /// Invalidates a stale async focus when requests arrive back to back
+        /// or the view goes away before the focus block runs.
+        var focusGeneration = 0
         /// The last value pushed in from the browser side, so an update can
         /// tell a change worth applying from one it made itself.
         var synced = ""
@@ -247,6 +311,10 @@ struct AddressField: NSViewRepresentable {
 
         init(browser: Browser) {
             self.browser = browser
+        }
+
+        func controlTextDidEndEditing(_ note: Notification) {
+            inputScope.end()
         }
 
         func controlTextDidChange(_ note: Notification) {
@@ -287,6 +355,7 @@ struct AddressField: NSViewRepresentable {
         ) -> Bool {
             switch command {
             case #selector(NSResponder.insertNewline(_:)):
+                inputScope.end(editor: textView)
                 browser.submit()
                 return true
             case #selector(NSResponder.moveDown(_:)):
