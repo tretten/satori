@@ -15,11 +15,19 @@ enum Web {
     /// Modern WebKit pools processes by data store on its own — every tab
     /// asking for the same one is what gets the second tab a warm process, and
     /// the old WKProcessPool knob does nothing now.
-    /// Web tabs and extension views alike send WebKit's native user agent
-    /// with nothing appended (see Extensions.init): claiming Chrome on a
-    /// WebKit engine, without Chromium client hints or JS identity, is an
-    /// inconsistent identity that bot management (Akamai, e.g. uniqlo.com)
-    /// refuses with 403 while Safari's consistent native UA passes.
+    /// Web tabs and extension views alike send Safari's user agent, exactly
+    /// (see Extensions.init): claiming Chrome on a WebKit engine, without
+    /// Chromium client hints or JS identity, is an inconsistent identity that
+    /// bot management (Akamai, e.g. uniqlo.com) refuses with 403. WebKit's bare
+    /// UA stops at "(KHTML, like Gecko)", and without the "Version/… Safari/…"
+    /// Safari puts after it, Gmail and Wrike turn the browser away as
+    /// unsupported. The version is the installed Safari's — the same WebKit
+    /// this runs on, so the claim is never older or newer than the engine.
+    static let safariName: String = {
+        let plist = URL(fileURLWithPath: "/Applications/Safari.app/Contents/Info.plist")
+        let version = (NSDictionary(contentsOf: plist)?["CFBundleShortVersionString"] as? String) ?? "26.0"
+        return "Version/\(version) Safari/605.1.15"
+    }()
 
     static func configuration(shy: Bool = false) -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
@@ -31,9 +39,9 @@ enum Web {
         // Chrome extensions see every page but a private one. The controller
         // has to be there when the view is made; it can't be added after.
         if #available(macOS 15.4, *), !shy { MainActor.assumeIsolated { Extensions.attach(config) } }
-        // applicationNameForUserAgent is left unset on purpose, matching the
-        // extension views (see Extensions.init): WebKit then sends its native
-        // user agent everywhere, and workers stay alive.
+        // The same name as the extension views (see Extensions.init): one
+        // user agent everywhere keeps workers alive.
+        config.applicationNameForUserAgent = safariName
         config.allowsAirPlayForMediaPlayback = true
         // Off by default on macOS, which is why a full-screen button on a video
         // did nothing at all: the page asks, and WebKit refuses without a word.
@@ -320,6 +328,21 @@ final class Tab: ObservableObject, Identifiable {
     /// strip's edge so the strip can wear it and read as the page continuing
     /// upward.
     @Published private(set) var themeColor: Tint?
+    /// The colour the page itself last offered, kept so a colour picked by
+    /// hand can be taken back without waiting for the page to say it again.
+    private var offered: Tint?
+    /// A few of the page's own colours, for the tab menu to offer.
+    @Published var palette: [Tint] = []
+
+    /// The colour picked for this site by hand, if one was.
+    var chosenTint: Tint? { Tint.chosen(for: address?.host()) }
+
+    /// Picks the colour this site wears; nil goes back to the page's own.
+    func choose(_ tint: Tint?) {
+        guard let host = address?.host() else { return }
+        Tint.choose(tint, for: host)
+        themeColor = tint ?? offered
+    }
 
     private var watch: [NSKeyValueObservation] = []
 
@@ -388,12 +411,8 @@ final class Tab: ObservableObject, Identifiable {
         if !EXTENSIONS_HIDDEN { controller.add(shop, name: StoreRelay.name) }
         controller.add(links, name: LinkRelay.name)
         controller.add(forms, name: FormRelay.name)
-        // Notifications are a web app's own thing — a hundred ordinary tabs
-        // have no business posting to the Dock badge on some site's behalf.
-        if WebApp.on {
-            controller.addScriptMessageHandler(notes, contentWorld: .page, name: NotifyRelay.name)
-            controller.add(edges, name: EdgeRelay.name)
-        }
+        if !shy { controller.addScriptMessageHandler(notes, contentWorld: .page, name: NotifyRelay.name) }
+        if WebApp.on { controller.add(edges, name: EdgeRelay.name) }
         Shield.shared.protect(controller)
         built = web
         // Eager strip inset at creation, before any load or first paint:
@@ -517,15 +536,26 @@ final class Tab: ObservableObject, Identifiable {
         controller.addUserScript(
             WKUserScript(source: LinkRelay.watch, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
         )
-        // The Notification shim — only a web app's own site gets to replace
-        // window.Notification; a hundred ordinary tabs have no native
-        // permission to speak for. removeAllUserScripts() above runs on every
+        if Shield.shared.enabled {
+            controller.addUserScript(
+                WKUserScript(source: Shield.nudges, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+            )
+        }
+        if Store.settings.object(forKey: "links.warm") as? Bool ?? true {
+            controller.addUserScript(
+                WKUserScript(source: Warm.script, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+            )
+        }
+        // The Notification shim. removeAllUserScripts() above runs on every
         // main-frame navigation, so this has to be re-added here each time,
-        // not once at build().
-        if WebApp.on {
+        // not once at build() — which also keeps the answers it carries fresh.
+        // A private tab keeps none: it asks nothing and remembers nothing.
+        if !shy {
             controller.addUserScript(
                 WKUserScript(source: NotifyRelay.shim(), injectionTime: .atDocumentStart, forMainFrameOnly: true)
             )
+        }
+        if WebApp.on {
             controller.addUserScript(
                 WKUserScript(source: EdgeRelay.watch, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
             )
@@ -554,8 +584,10 @@ final class Tab: ObservableObject, Identifiable {
             return
         }
         let zoom = built?.pageZoom ?? 1
+        // The page's viewport starts below the strip's inset, the stage at
+        // the window's top: without it the list lands over the box.
         onField?(self, CGRect(
-            x: rect.minX * zoom, y: rect.minY * zoom,
+            x: rect.minX * zoom, y: rect.minY * zoom + desiredTopInset,
             width: rect.width * zoom, height: rect.height * zoom
         ))
     }
@@ -648,13 +680,58 @@ final class Tab: ObservableObject, Identifiable {
 
     /// Called from the page, a few dozen times a second at most — the script
     /// already waits for a frame before it says anything.
-    func scrolled(to y: Double, of ceiling: Double, color: Tint?) {
+    func scrolled(to y: Double, of ceiling: Double, full: Bool) {
         reading = ceiling > 0 ? min(1, max(0, y / ceiling)) : 0
-        // A web app's colour comes from its pixels instead (see WebApp.edge).
-        if !WebApp.on, color != themeColor { themeColor = color }
+        // A web app reads its own edge (see WebApp.edge).
+        if !WebApp.on { readColors(full: full) }
         let delta = y - lastY
         lastY = y
         onScroll?(self, y, delta)
+    }
+
+    /// The strip's colour, read off the page as it is actually drawn: the
+    /// most common colour of the row just under the strip. A page's styles
+    /// can't see a theme picture, or a layer painted beside the element
+    /// rather than behind it (Gmail); its pixels can. `full` also reads a
+    /// spread of spots across the page for the tab menu's Tab Color.
+    ///
+    /// Scrolling asks for the row alone, one read at a time and twenty a
+    /// second at most; the fuller read is rare (a page arriving) and always
+    /// goes ahead. A view that isn't on screen has nothing to read.
+    func readColors(full: Bool = false) {
+        guard let web = built, web.window?.occlusionState.contains(.visible) == true, web.bounds.width > 0 else { return }
+        let now = CACurrentMediaTime()
+        if !full {
+            guard !edgeBusy, now - edgeLast >= 0.045 else { return }
+            edgeBusy = true
+            edgeLast = now
+        }
+        let shot = WKSnapshotConfiguration()
+        // In the page's own coordinates: y 0 is the first row under the strip.
+        shot.rect = CGRect(x: 0, y: 0, width: web.bounds.width,
+                           height: full ? max(2, web.bounds.height - desiredTopInset) : 2)
+        shot.snapshotWidth = 200
+        shot.afterScreenUpdates = false
+        web.takeSnapshot(with: shot) { [weak self] image, _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if !full { self.edgeBusy = false }
+                guard let image, let pixels = Pixels(image) else { return }
+                let top = pixels.commonest(row: 0)
+                self.offered = top
+                self.wear(self.chosenTint ?? top)
+                if full {
+                    let spots = [(0.5, 0.0), (0.05, 0.0), (0.95, 0.0), (0.05, 0.5), (0.5, 0.5),
+                                 (0.95, 0.5), (0.05, 0.95), (0.5, 0.95), (0.95, 0.95)]
+                    var found: [Tint] = top.map { [$0] } ?? []
+                    for (x, y) in spots where found.count < 4 {
+                        let tint = pixels.at(x: x, y: y)
+                        if !found.contains(tint) { found.append(tint) }
+                    }
+                    if found != self.palette { self.palette = found }
+                }
+            }
+        }
     }
 
     /// The colour a web app's bar has read off the top of this page.
@@ -676,7 +753,9 @@ final class Tab: ObservableObject, Identifiable {
         // wearing it until the new document's first scroll report arrives.
         // The injected script calls tell() at document end, which sets the
         // new colour (or nil for a transparent page) straight away.
-        themeColor = nil
+        offered = nil
+        palette = []
+        themeColor = chosenTint
         reader = false
         typing = false
         immersed = false
@@ -1469,20 +1548,8 @@ final class ScrollRelay: NSObject, WKScriptMessageHandler {
         guard let y = body["y"] as? Double,
               let ceiling = body["max"] as? Double
         else { return }
-        var rgb: (r: Double, g: Double, b: Double)?
-        if let raw = body["tint"] as? [Any], raw.count >= 3,
-           let r = (raw[0] as? NSNumber)?.doubleValue,
-           let g = (raw[1] as? NSNumber)?.doubleValue,
-           let b = (raw[2] as? NSNumber)?.doubleValue {
-            rgb = (r, g, b)
-        }
-        MainActor.assumeIsolated {
-            // Every opaque colour the page offers is worn: the tab text
-            // contrasts with it instead. Nil only when the page offered
-            // nothing usable (transparent / missing).
-            let tint: Tint? = rgb.map { Tint(bytes: $0.r, g: $0.g, b: $0.b) }
-            tab?.scrolled(to: y, of: ceiling, color: tint)
-        }
+        let full = body["full"] as? Bool ?? false
+        MainActor.assumeIsolated { tab?.scrolled(to: y, of: ceiling, full: full) }
     }
 
     /// Reports at most once a frame, and passively, so a page that scrolls
@@ -1490,43 +1557,64 @@ final class ScrollRelay: NSObject, WKScriptMessageHandler {
     static let script = """
     (function () {
       var waiting = false;
-      // The colour of the element just under the strip's edge, so the strip
-      // can wear it and read as the page continuing upward. Walks up past
-      // anything that paints nothing to the first solid colour it meets.
-      function tint() {
-        var el = document.elementFromPoint(window.innerWidth / 2, 1);
-        while (el && el !== document.documentElement) {
-          var c = getComputedStyle(el).backgroundColor;
-          if (c.indexOf('rgba') === 0) {
-            if (parseFloat(c.slice(c.lastIndexOf(',') + 1)) === 0) { el = el.parentElement; continue; }
-          }
-          var m = c.match(/[0-9]+/g);
-          if (m && m.length >= 3) return [ +m[0], +m[1], +m[2] ];
-          el = el.parentElement;
-        }
-        // The walk stops before <html>: a page that paints its ground there
-        // (transparent <body>) still offers an opaque colour worth wearing.
-        var rc = getComputedStyle(document.documentElement).backgroundColor;
-        if (rc.indexOf('rgba') !== 0 || parseFloat(rc.slice(rc.lastIndexOf(',') + 1)) !== 0) {
-          var rm = rc.match(/[0-9]+/g);
-          if (rm && rm.length >= 3) return [ +rm[0], +rm[1], +rm[2] ];
-        }
-        return null;
-      }
-      function tell() {
+      function tell(full) {
         var root = document.documentElement;
         var y = window.scrollY || root.scrollTop || 0;
         var ceiling = Math.max(1, (root.scrollHeight || 0) - window.innerHeight);
-        window.webkit.messageHandlers.\(name).postMessage({ y: y, max: ceiling, tint: tint() });
+        window.webkit.messageHandlers.\(name).postMessage({ y: y, max: ceiling, full: !!full });
       }
+      // Captured, so a page that scrolls a panel of its own rather than the
+      // window (Gmail) is still heard.
       window.addEventListener('scroll', function () {
         if (waiting) return;
         waiting = true;
         requestAnimationFrame(function () { waiting = false; tell(); });
-      }, { passive: true });
-      tell();
+      }, { passive: true, capture: true });
+      tell(true);
+      // A page built by script is often still a loading screen here, and
+      // one that never scrolls the window would keep that look for good.
+      [600, 2000, 5000].forEach(function (ms) { setTimeout(function () { tell(true); }, ms); });
     })();
     """ 
 }
 
+/// A picture of the page as sRGB bytes, top row first.
+private struct Pixels {
+    let width: Int
+    let height: Int
+    let bytes: [UInt8]
 
+    init?(_ image: NSImage) {
+        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              cg.width > 0, cg.height > 0,
+              let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(data: nil, width: cg.width, height: cg.height, bitsPerComponent: 8,
+                                      bytesPerRow: cg.width * 4, space: space,
+                                      bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue),
+              let data = context.data
+        else { return nil }
+        context.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
+        width = cg.width
+        height = cg.height
+        bytes = Array(UnsafeBufferPointer(start: data.assumingMemoryBound(to: UInt8.self), count: cg.width * cg.height * 4))
+    }
+
+    /// At a spot given as fractions of the width and height.
+    func at(x: Double, y: Double) -> Tint {
+        let i = (Int(y * Double(height - 1)) * width + Int(x * Double(width - 1))) * 4
+        return Tint(bytes: Double(bytes[i]), g: Double(bytes[i + 1]), b: Double(bytes[i + 2]))
+    }
+
+    /// The colour most of a row is, so a logo or a search box sitting on the
+    /// edge doesn't colour the whole strip.
+    func commonest(row: Int) -> Tint? {
+        var counts: [Int: Int] = [:]
+        let start = row * width * 4
+        for x in 0..<width {
+            let i = start + x * 4
+            counts[Int(bytes[i]) << 16 | Int(bytes[i + 1]) << 8 | Int(bytes[i + 2]), default: 0] += 1
+        }
+        guard let (key, _) = counts.max(by: { $0.value < $1.value }) else { return nil }
+        return Tint(bytes: Double(key >> 16 & 0xFF), g: Double(key >> 8 & 0xFF), b: Double(key & 0xFF))
+    }
+}

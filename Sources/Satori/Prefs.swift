@@ -63,6 +63,11 @@ final class Preferences: ObservableObject {
     @Published var floatsVideo: Bool {
         didSet { store.set(floatsVideo, forKey: "float.auto") }
     }
+    /// A linked site connected to while the pointer rests on its link (see
+    /// Warm). On unless turned off.
+    @Published var warmsLinks: Bool {
+        didSet { store.set(warmsLinks, forKey: "links.warm") }
+    }
     /// The ad blocker. On unless turned off; there is nothing else to it.
     @Published var shielded: Bool {
         didSet { store.set(shielded, forKey: "shield") }
@@ -137,6 +142,7 @@ final class Preferences: ObservableObject {
         glyph = store.string(forKey: "glyph").flatMap(Glyph.init) ?? .icons
         sleepsTabs = store.object(forKey: "tabs.sleep") as? Bool ?? true
         floatsVideo = store.object(forKey: "float.auto") as? Bool ?? true
+        warmsLinks = store.object(forKey: "links.warm") as? Bool ?? true
         shielded = store.object(forKey: "shield") as? Bool ?? true
         // A test run downloads into its own folder: ~/Downloads would have
         // macOS stop it to ask for access, with a dialog on the screen of

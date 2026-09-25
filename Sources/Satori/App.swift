@@ -291,7 +291,7 @@ struct ContentView: View {
                 VStack(spacing: 0) {
                     // Safari-Compact overlay: the page extends behind the 48pt
                     // strip (`stripReserve` is 0) and WebKit obscured insets
-                    // (`Tab.desiredTopInset`, 48) shift normal flow AND fixed/sticky
+                    // (`Tab.desiredTopInset`, the strip height) shift normal flow AND fixed/sticky
                     // site headers below the bar while scrolled content slides
                     // beneath the translucent material. The TabBar stays above
                     // the page in the ZStack so hit-testing, DragStrip,
@@ -647,7 +647,7 @@ struct ContentView: View {
     /// The obscured top inset lives in `Tab.desiredTopInset` (single source
     /// of truth, resolved live by the stage). No snapshot is computed here:
     /// a value captured at render time used to race `Tab.applyTopInsetNow`
-    /// and overwrite the correct 48 with a stale 0 on a later layout.
+    /// and overwrite the correct inset with a stale 0 on a later layout.
 
     /// Put the resting circles in the title bar, exactly over the buttons,
     /// for when the app is behind: macOS's own resting buttons come out

@@ -426,13 +426,19 @@ enum WebApp {
     }
 }
 
-// MARK: - notifications (web-app mode only)
+// MARK: - notifications
 
 /// `window.Notification`, `ServiceWorkerRegistration.showNotification` and
 /// `navigator.setAppBadge` all come through here from the page, and native
-/// notifications come back the other way through `NotifyCenter`. Only wired
-/// up in web-app mode: the main browser has no one site's notifications to
-/// be, and no Dock badge that means anything for a hundred open tabs.
+/// notifications come back the other way through `WebAppNotifyDelegate`.
+/// WKWebView on the Mac has no notifications of its own to give a page, so
+/// without this every site is told they're blocked.
+///
+/// A web app is one site, and its answer is the app's. The browser asks per
+/// site, and keeps each answer; a Dock badge means nothing for a hundred
+/// open tabs, so only a web app gets one. The page can post here directly,
+/// past the shim, so what it may do is decided here from the frame's real
+/// origin, never from what the page says.
 final class NotifyRelay: NSObject, WKScriptMessageHandlerWithReply {
     static let name = "satoriNotify"
 
@@ -447,16 +453,48 @@ final class NotifyRelay: NSObject, WKScriptMessageHandlerWithReply {
             replyHandler(nil, "bad message")
             return
         }
+        let host = message.frameInfo.securityOrigin.host
         switch kind {
         case "ask":
-            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
-                let answer = granted ? "granted" : "denied"
-                Store.settings.set(answer, forKey: "notifications")
-                DispatchQueue.main.async { replyHandler(answer, nil) }
+            if WebApp.on {
+                UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
+                    let answer = granted ? "granted" : "denied"
+                    Store.settings.set(answer, forKey: "notifications")
+                    DispatchQueue.main.async { replyHandler(answer, nil) }
+                }
+                return
+            }
+            guard !host.isEmpty else { return replyHandler("denied", nil) }
+            if let kept = Self.sites[host] { return replyHandler(kept, nil) }
+            guard let web = message.webView else { return replyHandler("default", nil) }
+            MainActor.assumeIsolated {
+                let alert = NSAlert()
+                alert.messageText = "\(host) wants to send you notifications"
+                alert.informativeText = "They arrive in Notification Center, even while Satori is in the background."
+                alert.addButton(withTitle: "Allow")
+                alert.addButton(withTitle: "Don't Allow")
+                Dialogs.show(alert, over: web) { response in
+                    guard response == .alertFirstButtonReturn else {
+                        Self.keep("denied", for: host)
+                        return replyHandler("denied", nil)
+                    }
+                    // macOS asks too, the first time any site is allowed.
+                    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, _ in
+                        let answer = granted ? "granted" : "denied"
+                        DispatchQueue.main.async {
+                            // Refused by macOS is not refused by you: asked
+                            // again once notifications are on for Satori.
+                            if granted { Self.keep(answer, for: host) }
+                            replyHandler(answer, nil)
+                        }
+                    }
+                }
             }
         case "show":
+            guard WebApp.on || Self.sites[host] == "granted" else { return replyHandler(nil, "not allowed") }
             let content = UNMutableNotificationContent()
             content.title = body["title"] as? String ?? WebApp.name ?? "Satori"
+            if !WebApp.on { content.subtitle = host }
             if let text = body["body"] as? String { content.body = text }
             if body["silent"] as? Bool != true { content.sound = .default }
             let id = body["id"] as? String ?? UUID().uuidString
@@ -474,6 +512,7 @@ final class NotifyRelay: NSObject, WKScriptMessageHandlerWithReply {
             UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [identifier])
             replyHandler(nil, nil)
         case "badge":
+            guard WebApp.on else { return replyHandler(nil, nil) }
             let count = body["count"] as? Int
             switch count {
             case nil, .some(0): NSApp.dockTile.badgeLabel = nil
@@ -492,19 +531,35 @@ final class NotifyRelay: NSObject, WKScriptMessageHandlerWithReply {
         Store.settings.string(forKey: "notifications") ?? "default"
     }
 
+    /// The browser's answers, by site: "granted" or "denied".
+    static var sites: [String: String] {
+        Store.settings.dictionary(forKey: "notify.sites") as? [String: String] ?? [:]
+    }
+
+    static func keep(_ answer: String, for host: String) {
+        var all = sites
+        all[host] = answer
+        Store.settings.set(all, forKey: "notify.sites")
+    }
+
     /// The shim replacing `window.Notification`. Interpolates the current
     /// permission so a page that checks `Notification.permission` before
     /// ever constructing one gets the right answer without a round trip.
     static func shim() -> String {
-        let permission = Self.permission
+        // The browser's shim goes in before the address is settled, so it
+        // carries every site's answer and picks its own.
+        let permission = WebApp.on ? Self.permission : "default"
+        let sites = WebApp.on ? "{}" : (try? JSONSerialization.data(withJSONObject: Self.sites))
+            .flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
         return #"""
         (function () {
           if (window.__satoriNotes) return;
+          const kept = \#(sites)[location.hostname];
           const post = (msg) => window.webkit.messageHandlers.satoriNotify.postMessage(msg);
           const live = new Map();
 
           class SatoriNotification extends EventTarget {
-            static permission = "\#(permission)";
+            static permission = kept || "\#(permission)";
             static requestPermission(cb) {
               return post({ kind: "ask" }).then((answer) => {
                 SatoriNotification.permission = answer;
@@ -568,6 +623,7 @@ final class NotifyRelay: NSObject, WKScriptMessageHandlerWithReply {
               return query(desc);
             };
           }
+          if (!\#(WebApp.on)) return;
           navigator.setAppBadge = function (n) {
             post({ kind: "badge", count: typeof n === "number" ? n : -1 });
             return Promise.resolve();

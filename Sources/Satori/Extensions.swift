@@ -115,11 +115,11 @@ final class Extensions: NSObject, ObservableObject {
         // extension's pages keep what they store where the browser does —
         // and a test run's apart from the real one's.
         views.websiteDataStore = Store.websites
-        // No applicationNameForUserAgent, matching the web tabs to the
-        // letter (see Web.configuration): WebKit gives workers the user
-        // agent of the last page that loaded and, when it differs, stops
-        // the running workers to apply it — and extension workers it then
-        // never starts again.
+        views.applicationNameForUserAgent = Web.safariName
+        // Matching the web tabs to the letter (see Web.configuration):
+        // WebKit gives workers the user agent of the last page that loaded
+        // and, when it differs, stops the running workers to apply it — and
+        // extension workers it then never starts again.
         // A test run sits behind other windows, where WebKit slows its views
         // to a crawl and messages between an extension's popup and its
         // worker stop arriving. Not what anyone is testing.

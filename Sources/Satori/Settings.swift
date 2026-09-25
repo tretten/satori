@@ -243,6 +243,10 @@ struct SettingsPanel: View {
             Line("Float video when you leave its tab", "A playing video goes on in a small window above everything. ⌘⇧P floats one by hand.") {
                 Switch(on: $prefs.floatsVideo)
             }
+            Rule()
+            Line("Connect ahead on hover", "A link to another site gets its connection ready while the pointer rests on it. Takes effect on the next page.") {
+                Switch(on: $prefs.warmsLinks)
+            }
         }
     }
 
@@ -454,6 +458,10 @@ struct SettingsPanel: View {
                     Pill("Send Feedback") { Links.writeFeedback() }
                 }
             }
+            Text("Based on driceroland/Search under the MIT license.")
+                .font(.system(size: 11))
+                .foregroundStyle(Palette.faint)
+                .padding(.top, 2)
         }
     }
 

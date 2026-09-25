@@ -35,9 +35,9 @@ final class Browser: NSObject, ObservableObject {
     /// in Tab is untouched.
     private func watchTint() {
         if let id = activeID, let tab = tabs.first(where: { $0.id == id }) {
-            tintWatch = tab.$themeColor.sink { [weak self] tint in
+            tintWatch = tab.$themeColor.sink { [weak self, weak tab] tint in
                 guard let self else { return }
-                self.themeColor = self.prefs.adaptive || WebApp.on ? tint : nil
+                self.themeColor = self.wearsTint(tab) ? tint : nil
             }
         } else {
             tintWatch = nil
@@ -45,12 +45,16 @@ final class Browser: NSObject, ObservableObject {
         }
     }
 
+    /// Whether the strip wears a tab's colour: Adaptive on, a web app, or a
+    /// colour picked by hand, which is worn even with Adaptive off.
+    private func wearsTint(_ tab: Tab?) -> Bool {
+        prefs.adaptive || WebApp.on || tab?.chosenTint != nil
+    }
+
     /// Re-read the active tab's tint through the adaptive gate. Called when
     /// the checkbox flips so the live UI updates without a reload.
     private func refreshTint() {
-        guard prefs.adaptive || WebApp.on, let id = activeID,
-              let tab = tabs.first(where: { $0.id == id })
-        else {
+        guard let id = activeID, let tab = tabs.first(where: { $0.id == id }), wearsTint(tab) else {
             themeColor = nil
             return
         }
@@ -652,7 +656,7 @@ final class Browser: NSObject, ObservableObject {
             WebApp.refreshRegistered()
         }
         welcoming = !WebApp.on && !prefs.welcomed
-        if WebApp.on { WebAppNotifyDelegate.browser = self }
+        WebAppNotifyDelegate.browser = self
 
         // The History menu lists what the history holds, and the menu is drawn
         // from this object's changes — so the history's are passed on.
@@ -962,6 +966,8 @@ final class Browser: NSObject, ObservableObject {
         // The tab just looked at gets asked once whether anything on it
         // could be floated; the load finishing says again (see didFinish).
         tab.refreshFloatAvailability()
+        // A page that loaded out of sight couldn't be read for its colours.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak tab] in tab?.readColors(full: true) }
         rememberSession()
         editing = false
         typed = ""
@@ -1740,6 +1746,7 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
         didBecome download: WKDownload
     ) {
         keep(download)
+        leaveIfEmpty(webView)
     }
 
     func webView(
@@ -1748,6 +1755,17 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
         didBecome download: WKDownload
     ) {
         keep(download)
+        leaveIfEmpty(webView)
+    }
+
+    /// A tab opened only to fetch a file (Wrike's attachment links open one
+    /// that redirects to the file) has nothing to show once the file is on
+    /// its way, and is closed, as other browsers do. A tab that had a page
+    /// keeps it: a download never replaces what is already there. The
+    /// download itself lives on without the view.
+    private func leaveIfEmpty(_ webView: WKWebView) {
+        guard webView.backForwardList.currentItem == nil, let tab = tab(for: webView) else { return }
+        close(tab)
     }
 
     /// Take a download down. WebKit answers in the completion handler,

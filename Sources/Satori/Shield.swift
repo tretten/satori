@@ -144,3 +144,58 @@ final class Shield: ObservableObject {
         }
     }
 }
+
+extension Shield {
+    /// Google's "Switch to Chrome?" — on its search, Gmail, YouTube and the
+    /// Web Store, to anyone not in Chrome, Safari included. Not the site
+    /// refusing the browser, only Google asking; answered "No thanks" where
+    /// there is such a button, so Google remembers, and otherwise taken off
+    /// the screen. Found by what it says, since its markup changes weekly —
+    /// the sentence doesn't. Google's own sites only, and at most once a
+    /// second: Gmail changes its page all the time.
+    static let nudges = """
+    (function () {
+      if (window.__satoriNudges || window.top !== window) return;
+      if (!/(^|\\.)(google\\.[a-z.]+|youtube\\.com|gmail\\.com)$/.test(location.hostname)) return;
+      window.__satoriNudges = true;
+      var said = /switch to chrome|google recommends using chrome|try (google )?chrome|get (google )?chrome|use chrome|download chrome|перейти на chrome|попробуйте (google )?chrome|скачайте chrome|google рекомендует/i;
+      var no = /^(no,? thanks|not now|no thanks|dismiss|close|нет,? спасибо|не сейчас|закрыть)$/i;
+      function box(el) {
+        for (var n = el, i = 0; n && n !== document.body && i < 12; n = n.parentElement, i++) {
+          var role = n.getAttribute && n.getAttribute('role');
+          if (role === 'dialog' || role === 'alertdialog' || n.getAttribute('aria-modal') === 'true') return n;
+          var pos = getComputedStyle(n).position;
+          if (pos === 'fixed' || pos === 'sticky') return n;
+        }
+        return null;
+      }
+      function sweep() {
+        var found = document.evaluate("//*[contains(text(),'Chrome')]", document.body || document, null,
+          XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+        for (var i = 0; i < found.snapshotLength; i++) {
+          var el = found.snapshotItem(i);
+          if (!said.test(el.textContent || '') || el.closest('[data-satori-nudge]')) continue;
+          var b = box(el);
+          if (!b) continue;
+          b.setAttribute('data-satori-nudge', '');
+          var buttons = b.querySelectorAll('button, [role=button], a');
+          var answered = false;
+          for (var j = 0; j < buttons.length; j++) {
+            var label = (buttons[j].textContent || buttons[j].getAttribute('aria-label') || '').trim();
+            if (no.test(label)) { buttons[j].click(); answered = true; break; }
+          }
+          if (!answered) b.style.setProperty('display', 'none', 'important');
+        }
+      }
+      var last = 0, queued = false;
+      function soon() {
+        if (queued) return;
+        queued = true;
+        setTimeout(function () { queued = false; last = Date.now(); sweep(); }, Math.max(0, 1000 - (Date.now() - last)));
+      }
+      new MutationObserver(soon).observe(document.documentElement, { childList: true, subtree: true });
+      soon();
+    })();
+    """
+}
+

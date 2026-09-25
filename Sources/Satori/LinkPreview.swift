@@ -119,6 +119,45 @@ final class LinkRelay: NSObject, WKScriptMessageHandler {
     """
 }
 
+/// Another site, connected to while the pointer is still on its link — the
+/// part of instant.page and FasterWeb that WebKit lets a browser do. After
+/// 65 ms on a link (a pass across it is not a hover), the DNS, TCP and TLS a first visit waits on are done ahead with
+/// `rel=preconnect`. Once per site, main frame only; a link on the same site
+/// already has its connection.
+///
+/// Fetching the page itself was tried and measured: WebKit keeps a fetch's
+/// response apart from a navigation's in its cache, so the click loads it
+/// again, and the fetch was only extra traffic. It has neither
+/// `rel=prefetch` nor working speculation rules. Settings › Tabs turns this
+/// off.
+enum Warm {
+    static let script = """
+    (function () {
+      if (window.__satoriWarm || window.top !== window) return;
+      window.__satoriWarm = true;
+      var done = {}, timer = null;
+      function link(e) {
+        return e.target && e.target.closest ? e.target.closest('a[href]') : null;
+      }
+      function warm(a) {
+        var url;
+        try { url = new URL(a.href, document.baseURI); } catch (err) { return; }
+        if (!/^https?:$/.test(url.protocol) || url.origin === location.origin || done[url.origin]) return;
+        done[url.origin] = true;
+        var hint = document.createElement('link');
+        hint.rel = 'preconnect';
+        hint.href = url.origin;
+        (document.head || document.documentElement).appendChild(hint);
+      }
+      document.addEventListener('mouseover', function (e) {
+        clearTimeout(timer);
+        var a = link(e);
+        if (a) timer = setTimeout(function () { warm(a); }, 65);
+      }, { capture: true, passive: true });
+    })();
+    """
+}
+
 /// The bubble itself: the app's quiet voice — ground fill, hairline, soft
 /// shadow — which follows light/dark through `Palette` automatically.
 /// Opaque fill (no material), so Reduce Transparency needs no special case;

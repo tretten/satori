@@ -854,6 +854,19 @@ struct TabMenu: View {
             browser.copyAddress()
         }
         .disabled(tab.isBlank)
+        Menu("Tab Color") {
+            ForEach(tab.palette, id: \.hex) { tint in
+                Button {
+                    tab.choose(tint)
+                } label: {
+                    Label { Text(tab.chosenTint == tint ? "\(tint.hex)  ✓" : tint.hex) } icon: { Image(nsImage: tint.swatch) }
+                }
+            }
+            if !tab.palette.isEmpty { Divider() }
+            Button("The Page's Own") { tab.choose(nil) }
+                .disabled(tab.chosenTint == nil)
+        }
+        .disabled(tab.isBlank)
         Divider()
         Button("Close Tab", action: close)
         Button("Close Other Tabs") { browser.closeOthers(but: tab) }

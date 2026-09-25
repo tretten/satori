@@ -116,7 +116,7 @@ final class Links: NSObject, NSApplicationDelegate {
             self, andSelector: #selector(handle(getURL:reply:)),
             forEventClass: AEEventClass(kInternetEventClass), andEventID: AEEventID(kAEGetURL)
         )
-        if WebApp.on { UNUserNotificationCenter.current().delegate = Links.notifyDelegate }
+        UNUserNotificationCenter.current().delegate = Links.notifyDelegate
     }
 
     @objc private func handle(getURL event: NSAppleEventDescriptor, reply: NSAppleEventDescriptor) {

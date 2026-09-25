@@ -87,6 +87,47 @@ struct Tint: Equatable {
     }
 }
 
+extension Tint {
+    /// Two hex digits a channel, as a person would read it: `#E8F0E4`.
+    var hex: String {
+        String(format: "#%02X%02X%02X", Int(red * 255 + 0.5), Int(green * 255 + 0.5), Int(blue * 255 + 0.5))
+    }
+
+    init?(hex: String) {
+        guard hex.count == 7, hex.hasPrefix("#"), let value = UInt32(hex.dropFirst(), radix: 16) else { return nil }
+        self.init(bytes: Double(value >> 16 & 0xFF), g: Double(value >> 8 & 0xFF), b: Double(value & 0xFF))
+    }
+
+    /// A small square of the colour, for a menu.
+    var swatch: NSImage {
+        let image = NSImage(size: NSSize(width: 14, height: 14), flipped: false) { rect in
+            NSColor(srgbRed: red, green: green, blue: blue, alpha: 1).setFill()
+            let path = NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 1), xRadius: 3.5, yRadius: 3.5)
+            path.fill()
+            NSColor.black.withAlphaComponent(0.15).setStroke()
+            path.stroke()
+            return true
+        }
+        image.isTemplate = false
+        return image
+    }
+
+    /// The colour picked by hand for a site (tab menu › Tab Color), which it
+    /// wears instead of whatever its pages offer.
+    static func chosen(for host: String?) -> Tint? {
+        guard let host else { return nil }
+        let sites = Store.settings.dictionary(forKey: "tint.sites") as? [String: String]
+        return sites?[host].flatMap(Tint.init(hex:))
+    }
+
+    /// Nil gives the site back its own colour.
+    static func choose(_ tint: Tint?, for host: String) {
+        var sites = Store.settings.dictionary(forKey: "tint.sites") as? [String: String] ?? [:]
+        sites[host] = tint?.hex
+        Store.settings.set(sites, forKey: "tint.sites")
+    }
+}
+
 /// Dark, light, or the Mac's own — the one choice that colours everything.
 enum Look: String, CaseIterable, Identifiable {
     case dark, light, system
@@ -132,8 +173,8 @@ enum Metrics {
     /// The tab strip. The window's title bar is grown to match it so the
     /// traffic lights come down with the tabs — otherwise giving the row room
     /// to breathe just leaves it sitting below three buttons it used to line
-    /// up with. Safari-tall: 48 points, 96 pixels on retina.
-    static let strip: CGFloat = 48
+    /// up with. 44 points: a little under Safari's 48.
+    static let strip: CGFloat = 44
     /// The top edge as the window has it: the strip, or a web app's bar —
     /// no tabs to hold, so no taller than a title bar needs.
     static var bar: CGFloat { WebApp.on ? 34 : strip }
