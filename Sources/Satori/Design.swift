@@ -134,6 +134,12 @@ enum Metrics {
     /// to breathe just leaves it sitting below three buttons it used to line
     /// up with. Safari-tall: 48 points, 96 pixels on retina.
     static let strip: CGFloat = 48
+    /// The top edge as the window has it: the strip, or a web app's bar —
+    /// no tabs to hold, so no taller than a title bar needs.
+    static var bar: CGFloat { WebApp.on ? 34 : strip }
+    /// How far below the bar's middle its row sits. The fade under a web
+    /// app's bar reads as more bar, so a row centred on the bar looked high.
+    static var barDrop: CGFloat { WebApp.on ? 3 : 0 }
     /// The page goes edge to edge; only its top corners are rounded, against
     /// the strip.
     static let pageInset: CGFloat = 0

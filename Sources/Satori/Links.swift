@@ -1,4 +1,5 @@
 import AppKit
+import UserNotifications
 
 // Links from elsewhere. A click in Mail, in Slack, in a PDF — macOS hands the
 // address to whichever app owns http, and this is how that app takes it.
@@ -105,12 +106,17 @@ final class Links: NSObject, NSApplicationDelegate {
     /// every address handed at launch had the window presented afresh, and
     /// five of them meant five rebuilds of the content before the window
     /// had shown once.
+    /// Held here rather than in a local — UNUserNotificationCenter keeps its
+    /// delegate weak, so a local would be nil the instant this method returns.
+    private static let notifyDelegate = WebAppNotifyDelegate()
+
     func applicationWillFinishLaunching(_ notification: Notification) {
         Links.watchForTrouble()
         NSAppleEventManager.shared().setEventHandler(
             self, andSelector: #selector(handle(getURL:reply:)),
             forEventClass: AEEventClass(kInternetEventClass), andEventID: AEEventID(kAEGetURL)
         )
+        if WebApp.on { UNUserNotificationCenter.current().delegate = Links.notifyDelegate }
     }
 
     @objc private func handle(getURL event: NSAppleEventDescriptor, reply: NSAppleEventDescriptor) {

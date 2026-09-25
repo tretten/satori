@@ -73,7 +73,10 @@ final class Preferences: ObservableObject {
     @Published var automaticallyChecksForUpdates: Bool {
         didSet {
             store.set(automaticallyChecksForUpdates, forKey: UpdaterController.automaticChecksKey)
-            UpdaterController.shared.setAutomaticallyChecksForUpdates(automaticallyChecksForUpdates)
+            // A web app never boots Sparkle in the first place (see
+            // SatoriApp.init) — asking it to change a setting it doesn't
+            // have would instantiate it just to do that.
+            if !WebApp.on { UpdaterController.shared.setAutomaticallyChecksForUpdates(automaticallyChecksForUpdates) }
         }
     }
     /// Offer to keep a password the first time a site sees it.

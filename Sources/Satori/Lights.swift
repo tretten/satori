@@ -20,7 +20,7 @@ final class Lights: NSObject {
     /// Where the close button's centre goes, from the window's top-left: set
     /// in tighter than a unified toolbar would, which Metrics.lights and
     /// sideLights are measured from.
-    static let centre = CGPoint(x: 21, y: 24)
+    static var centre: CGPoint { CGPoint(x: 21, y: Metrics.bar / 2 + Metrics.barDrop) }
 
     private static var kept: [ObjectIdentifier: Lights] = [:]
 
@@ -86,7 +86,7 @@ final class Lights: NSObject {
         defer { placing = false }
 
         // A title bar as tall as the strip, so the buttons can sit lower in it.
-        let height = Metrics.strip
+        let height = Metrics.bar
         var frame = container.frame
         if frame.height != height || frame.maxY != window.frame.height {
             frame.size.height = height

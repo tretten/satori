@@ -11,7 +11,8 @@ struct SettingsPanel: View {
 
     @ObservedObject private var shield = Shield.shared
     @State private var isDefault = Links.isDefault
-    @State private var page: Page = Page(rawValue: Store.settings.string(forKey: "settings.page") ?? "") ?? .general
+    @State private var page: Page = Page(rawValue: Store.settings.string(forKey: "settings.page") ?? "")
+        .flatMap { SettingsPanel.shown.contains($0) ? $0 : nil } ?? .general
     @StateObject private var recorder = ShortcutRecorder()
 
     enum Page: String, CaseIterable, Identifiable {
@@ -40,6 +41,18 @@ struct SettingsPanel: View {
             case .privacy: return "hand.raised"
             case .about: return "info.circle"
             }
+        }
+    }
+
+    /// The pages there are. Extensions are hidden for the first public
+    /// release. A web app is one site in one window: no tabs to arrange, no
+    /// address bar to search from, no extensions, the browser's shortcuts
+    /// are the browser's, and passwords are the browser's keychain's.
+    static var shown: [Page] {
+        Page.allCases.filter { page in
+            if EXTENSIONS_HIDDEN, page == .extensions { return false }
+            if WebApp.on, [.tabs, .search, .extensions, .shortcuts, .passwords].contains(page) { return false }
+            return true
         }
     }
 
@@ -74,8 +87,7 @@ struct SettingsPanel: View {
                 .padding(.horizontal, 10)
                 .padding(.top, 14)
                 .padding(.bottom, 12)
-            // Hidden for the first public release: no Extensions row.
-            ForEach(Page.allCases.filter { !EXTENSIONS_HIDDEN || $0 != .extensions }) { item in
+            ForEach(SettingsPanel.shown) { item in
                 PageRow(page: item, on: page == item) { page = item }
             }
             Spacer(minLength: 0)
@@ -157,39 +169,50 @@ struct SettingsPanel: View {
 
     private var general: some View {
         Card {
-            Line(
-                "Open links from other apps",
-                isDefault ? "Satori is the default browser on this Mac" : "Mail, Slack and the rest still send links elsewhere"
-            ) {
-                if isDefault {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Palette.ink)
-                        .frame(width: 24)
-                } else {
-                    Pill("Make default", filled: true) {
-                        Links.becomeDefault { worked in
-                            isDefault = Links.isDefault
-                            browser.announce(worked && isDefault ? "Links now open here" : "macOS left it as it was")
+            // A web app is one site under its own name — offering to make it
+            // the Mac's default browser would hand every link in every other
+            // app to a window that only ever shows the one place.
+            if !WebApp.on {
+                Line(
+                    "Open links from other apps",
+                    isDefault ? "Satori is the default browser on this Mac" : "Mail, Slack and the rest still send links elsewhere"
+                ) {
+                    if isDefault {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Palette.ink)
+                            .frame(width: 24)
+                    } else {
+                        Pill("Make default", filled: true) {
+                            Links.becomeDefault { worked in
+                                isDefault = Links.isDefault
+                                browser.announce(worked && isDefault ? "Links now open here" : "macOS left it as it was")
+                            }
                         }
                     }
                 }
+                Rule()
             }
-            Rule()
             Line("Appearance", "Dark, light, or what the Mac does. Pages follow it too") {
                 Segmented(options: Look.allCases.map { ($0, $0.title) }, selection: $prefs.look)
             }
-            Rule()
-            Line("Adaptive", "The top bar takes the colour of the page. Turn off to keep it plain.") {
-                Switch(on: $prefs.adaptive)
+            // A web app always wears its site's colour, and has no script
+            // socket to offer.
+            if !WebApp.on {
+                Rule()
+                Line("Adaptive", "The top bar takes the colour of the page. Turn off to keep it plain.") {
+                    Switch(on: $prefs.adaptive)
+                }
             }
             Rule()
             Line("Correct spelling as you type", "macOS autocorrect in pages. It capitalises for you.") {
                 Switch(on: $prefs.autocorrect)
             }
-            Rule()
-            Line("Let a script drive Satori", "A local socket for testing. Its tabs open beside yours with a flask on them and never take over. See ./bench") {
-                Switch(on: $prefs.bench)
+            if !WebApp.on {
+                Rule()
+                Line("Let a script drive Satori", "A local socket for testing. Its tabs open beside yours with a flask on them and never take over. See ./bench") {
+                    Switch(on: $prefs.bench)
+                }
             }
             Rule()
             Line("Save downloads to", prefs.downloads.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")) {
@@ -404,21 +427,25 @@ struct SettingsPanel: View {
             .padding(.bottom, 2)
 
             Card {
-                Line(
-                    "Check for updates automatically",
-                    prefs.automaticallyChecksForUpdates
-                        ? "Checked every day, installed when Satori quits"
-                        : "Only when you press the button below"
-                ) {
-                    Switch(on: $prefs.automaticallyChecksForUpdates)
-                }
-                Rule()
-                Line("Updates", "A newer Satori downloads quietly and waits for a quit") {
-                    Pill("Check for Updates…") {
-                        UpdaterController.shared.checkForUpdates(nil)
+                // A web app never runs Sparkle (see SatoriApp.init) — it is
+                // rebuilt from main Satori instead, on that app's own launch.
+                if !WebApp.on {
+                    Line(
+                        "Check for updates automatically",
+                        prefs.automaticallyChecksForUpdates
+                            ? "Checked every day, installed when Satori quits"
+                            : "Only when you press the button below"
+                    ) {
+                        Switch(on: $prefs.automaticallyChecksForUpdates)
                     }
+                    Rule()
+                    Line("Updates", "A newer Satori downloads quietly and waits for a quit") {
+                        Pill("Check for Updates…") {
+                            UpdaterController.shared.checkForUpdates(nil)
+                        }
+                    }
+                    Rule()
                 }
-                Rule()
                 Line("Found something wrong?", "Opens a draft with the version already in it") {
                     Pill("Send Feedback") { Links.writeFeedback() }
                 }

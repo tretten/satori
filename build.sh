@@ -48,7 +48,9 @@ NAME="Satori"
 # anything else fails loudly below instead of silently shipping a build
 # number Sparkle would ignore.
 VERSION="$(tr -d '[:space:]' < VERSION)"
-BUILD="$(python3 -c 'import sys; _, minor, patch = sys.argv[1].split("."); print(int(minor) * 100 + int(patch))' "$VERSION")"
+# Sparkle orders releases by this number alone, so the major version has
+# to count too: 1.0.0 must come after 0.8.0 (800), not land at 0.
+BUILD="$(python3 -c 'import sys; major, minor, patch = sys.argv[1].split("."); print(int(major) * 10000 + int(minor) * 100 + int(patch))' "$VERSION")"
 PATCH="$(python3 -c 'import sys; print(sys.argv[1].split(".")[2])' "$VERSION")"
 [ "$PATCH" -lt 100 ] || { echo "PATCH must stay below 100 for the Sparkle build number" >&2; exit 1; }
 # The oldest macOS this runs on — in the plist, and in the appcast so an

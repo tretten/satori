@@ -11,8 +11,11 @@ struct SatoriApp: App {
     @NSApplicationDelegateAdaptor(Links.self) private var links
 
     init() {
-        // Boot Sparkle (daily auto-checks + one background check on launch).
-        _ = UpdaterController.shared
+        // Boot Sparkle (daily auto-checks + one background check on launch) —
+        // never in a web app, which would otherwise "update" itself into a
+        // plain copy of Satori the moment Sparkle found a newer release.
+        if !WebApp.on { _ = UpdaterController.shared }
+        WebApp.stayAlive()
     }
 
     var body: some Scene {
@@ -27,29 +30,39 @@ struct SatoriApp: App {
             // Cmd+Q, menu Quit and Dock Quit all land in
             // Links.applicationShouldTerminate and share one dialog.
             CommandGroup(after: .appInfo) {
-                Button("Check for Updates…") {
-                    UpdaterController.shared.checkForUpdates(nil)
+                if !WebApp.on {
+                    Button("Check for Updates…") {
+                        UpdaterController.shared.checkForUpdates(nil)
+                    }
                 }
             }
             CommandGroup(replacing: .appTermination) {
-                Button("Quit Satori") { NSApp.terminate(nil) }
+                Button("Quit \(WebApp.name ?? "Satori")") { NSApp.terminate(nil) }
                     .keyboardShortcut("q")
             }
-            // One window. Tabs are the only kind of "new" there is.
+            // One window. Tabs are the only kind of "new" there is — except in
+            // a web app, which has neither.
             CommandGroup(replacing: .newItem) {
-                Button("New Tab") { browser.newTab() }
-                    .keyboardShortcut("t")
-                Button("New Private Tab") { browser.newShyTab() }
-                    .keyboardShortcut("n", modifiers: [.command, .shift])
-                Button("Reopen Closed Tab") { browser.reopen() }
-                    .keyboardShortcut("t", modifiers: [.command, .shift])
-                    .disabled(browser.ghosts.isEmpty)
-                Divider()
-                Button("Open Address…") { browser.edit() }
-                    .keyboardShortcut("l")
-                Divider()
-                Button("Close Tab") { if let tab = browser.active { browser.close(tab) } }
-                    .keyboardShortcut("w")
+                if WebApp.on {
+                    Button("Close Window") { NSApp.keyWindow?.performClose(nil) }
+                        .keyboardShortcut("w")
+                } else {
+                    Button("New Tab") { browser.newTab() }
+                        .keyboardShortcut("t")
+                    Button("New Private Tab") { browser.newShyTab() }
+                        .keyboardShortcut("n", modifiers: [.command, .shift])
+                    Button("Reopen Closed Tab") { browser.reopen() }
+                        .keyboardShortcut("t", modifiers: [.command, .shift])
+                        .disabled(browser.ghosts.isEmpty)
+                    Divider()
+                    Button("Open Address…") { browser.edit() }
+                        .keyboardShortcut("l")
+                    Button("Make Web App…") { browser.makeWebApp() }
+                        .disabled(browser.active?.isBlank ?? true)
+                    Divider()
+                    Button("Close Tab") { if let tab = browser.active { browser.close(tab) } }
+                        .keyboardShortcut("w")
+                }
             }
             CommandGroup(replacing: .printItem) {
                 Button("Print…") { browser.printPage() }
@@ -69,20 +82,22 @@ struct SatoriApp: App {
                     .disabled(!browser.finding)
             }
             CommandGroup(replacing: .toolbar) {
-                Toggle("Show Tabs in Sidebar", isOn: Binding(
-                    get: { browser.prefs.sidebar },
-                    set: { _ in browser.toggleSidebar() }
-                ))
-                .keyboardShortcut("s", modifiers: [.command, .shift])
-                Picker("Tabs show as", selection: Binding(
-                    get: { browser.prefs.glyph },
-                    set: { browser.prefs.glyph = $0 }
-                )) {
-                    ForEach(Glyph.allCases) { glyph in
-                        Text(glyph.title).tag(glyph)
+                if !WebApp.on {
+                    Toggle("Show Tabs in Sidebar", isOn: Binding(
+                        get: { browser.prefs.sidebar },
+                        set: { _ in browser.toggleSidebar() }
+                    ))
+                    .keyboardShortcut("s", modifiers: [.command, .shift])
+                    Picker("Tabs show as", selection: Binding(
+                        get: { browser.prefs.glyph },
+                        set: { browser.prefs.glyph = $0 }
+                    )) {
+                        ForEach(Glyph.allCases) { glyph in
+                            Text(glyph.title).tag(glyph)
+                        }
                     }
+                    Divider()
                 }
-                Divider()
                 Button("Reload Page") { browser.reload() }
                     .keyboardShortcut("r")
                 Button("Reading Mode") { browser.toggleReader() }
@@ -102,53 +117,57 @@ struct SatoriApp: App {
                 Button("Actual Size") { browser.resetZoom() }
                     .keyboardShortcut("0")
             }
-            CommandMenu("Tabs") {
-                let back = browser.prefs.binding(for: .back)
-                let forward = browser.prefs.binding(for: .forward)
-                Button("Back") { browser.back() }
-                    .keyboardShortcut(back.keyEquivalent, modifiers: back.eventModifiers)
-                    .disabled(browser.active?.canGoBack != true)
-                Button("Forward") { browser.forward() }
-                    .keyboardShortcut(forward.keyEquivalent, modifiers: forward.eventModifiers)
-                    .disabled(browser.active?.canGoForward != true)
-                Divider()
-                Button("Next Tab") { browser.step(1) }
-                    .keyboardShortcut("]", modifiers: [.command, .shift])
-                Button("Previous Tab") { browser.step(-1) }
-                    .keyboardShortcut("[", modifiers: [.command, .shift])
-                Button("Satori Tabs…") { browser.summon() }
-                    .keyboardShortcut("k")
-                Divider()
-                if let tab = browser.active {
-                    if tab.pin == nil {
-                        Button("Pin Tab") { browser.pin(tab) }
-                            .disabled(tab.isBlank)
-                    } else {
-                        Button("Change Letter") { browser.editLetter(tab) }
-                        Button("Unpin Tab") { browser.unpin(tab) }
+            if !WebApp.on {
+                CommandMenu("Tabs") {
+                    let back = browser.prefs.binding(for: .back)
+                    let forward = browser.prefs.binding(for: .forward)
+                    Button("Back") { browser.back() }
+                        .keyboardShortcut(back.keyEquivalent, modifiers: back.eventModifiers)
+                        .disabled(browser.active?.canGoBack != true)
+                    Button("Forward") { browser.forward() }
+                        .keyboardShortcut(forward.keyEquivalent, modifiers: forward.eventModifiers)
+                        .disabled(browser.active?.canGoForward != true)
+                    Divider()
+                    Button("Next Tab") { browser.step(1) }
+                        .keyboardShortcut("]", modifiers: [.command, .shift])
+                    Button("Previous Tab") { browser.step(-1) }
+                        .keyboardShortcut("[", modifiers: [.command, .shift])
+                    Button("Satori Tabs…") { browser.summon() }
+                        .keyboardShortcut("k")
+                    Divider()
+                    if let tab = browser.active {
+                        if tab.pin == nil {
+                            Button("Pin Tab") { browser.pin(tab) }
+                                .disabled(tab.isBlank)
+                        } else {
+                            Button("Change Letter") { browser.editLetter(tab) }
+                            Button("Unpin Tab") { browser.unpin(tab) }
+                        }
                     }
+                    Button("Duplicate Tab") { browser.duplicate() }
+                        .keyboardShortcut("d")
+                        .disabled(browser.active?.isBlank ?? true)
+                    Button("Copy Address") { browser.copyAddress() }
+                        .keyboardShortcut("c", modifiers: [.command, .shift])
+                        .disabled(browser.active?.isBlank ?? true)
+                    Button("Paste and Go") { browser.pasteAndGo() }
+                        .keyboardShortcut("v", modifiers: [.command, .shift])
+                    Divider()
+                    Button("Close Other Tabs") { if let tab = browser.active { browser.closeOthers(but: tab) } }
+                        .disabled(browser.tabs.count < 2)
+                    Button("Stop Sound in Tab") { browser.pauseMedia() }
+                        .keyboardShortcut("m", modifiers: [.command, .shift])
                 }
-                Button("Duplicate Tab") { browser.duplicate() }
-                    .keyboardShortcut("d")
-                    .disabled(browser.active?.isBlank ?? true)
-                Button("Copy Address") { browser.copyAddress() }
-                    .keyboardShortcut("c", modifiers: [.command, .shift])
-                    .disabled(browser.active?.isBlank ?? true)
-                Button("Paste and Go") { browser.pasteAndGo() }
-                    .keyboardShortcut("v", modifiers: [.command, .shift])
-                Divider()
-                Button("Close Other Tabs") { if let tab = browser.active { browser.closeOthers(but: tab) } }
-                    .disabled(browser.tabs.count < 2)
-                Button("Stop Sound in Tab") { browser.pauseMedia() }
-                    .keyboardShortcut("m", modifiers: [.command, .shift])
             }
-            CommandMenu("Bookmarks") {
-                Button("Bookmark This Page") { browser.bookmarkCurrent() }
-                    .keyboardShortcut("b", modifiers: [.command, .shift])
-                    .disabled(browser.active?.isBlank ?? true)
-                Button("Show Bookmarks…") { browser.bookmarking = true }
-                Divider()
-                BookmarkTree(nodes: browser.bookmarks.roots) { browser.visit($0) }
+            if !WebApp.on {
+                CommandMenu("Bookmarks") {
+                    Button("Bookmark This Page") { browser.bookmarkCurrent() }
+                        .keyboardShortcut("b", modifiers: [.command, .shift])
+                        .disabled(browser.active?.isBlank ?? true)
+                    Button("Show Bookmarks…") { browser.bookmarking = true }
+                    Divider()
+                    BookmarkTree(nodes: browser.bookmarks.roots) { browser.visit($0) }
+                }
             }
             CommandMenu("History") {
                 Section("Recently Visited") {
@@ -182,9 +201,11 @@ struct SatoriApp: App {
             CommandGroup(after: .appSettings) {
                 Button("Settings…") { browser.tuning = true }
                     .keyboardShortcut(",")
-                Button("Welcome…") { browser.welcoming = true }
-                Button("Passwords…") { browser.managing = true }
-                    .keyboardShortcut("l", modifiers: [.command, .option])
+                if !WebApp.on {
+                    Button("Welcome…") { browser.welcoming = true }
+                    Button("Passwords…") { browser.managing = true }
+                        .keyboardShortcut("l", modifiers: [.command, .option])
+                }
             }
             CommandGroup(replacing: .help) {
                 Button("Send Feedback…") { Links.writeFeedback() }
@@ -303,7 +324,11 @@ struct ContentView: View {
                 .clipShape(RoundedRectangle(cornerRadius: pagePad > 0 ? Metrics.pageRadius : 0, style: .continuous))
             }
 
-            if !browser.prefs.sidebar, browser.active?.immersed != true {
+            if WebApp.on {
+                if browser.active?.immersed != true {
+                    AppStrip(browser: browser)
+                }
+            } else if !browser.prefs.sidebar, browser.active?.immersed != true {
                 TabBar(browser: browser)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
@@ -384,7 +409,7 @@ struct ContentView: View {
                     .contentShape(Rectangle())
                     .onTapGesture { browser.reviewing = false }
                 HiddenPanel(browser: browser)
-                    .padding(.top, Metrics.strip + 8)
+                    .padding(.top, Metrics.bar + 8)
                     .padding(.trailing, 14)
                     .transition(.scale(scale: 0.97, anchor: .topTrailing).combined(with: .opacity))
             }
@@ -576,7 +601,7 @@ struct ContentView: View {
 
     /// True while the tabs are down the left.
     private var sidebar: Bool {
-        browser.prefs.sidebar && browser.active?.immersed != true
+        !WebApp.on && browser.prefs.sidebar && browser.active?.immersed != true
     }
 
     /// The page floats on the ground with air around it — except while one
@@ -605,7 +630,13 @@ struct ContentView: View {
     ///
     /// Reduce Transparency keeps working via the material's own default
     /// fallback (opaque fill).
-    private var stripReserve: CGFloat { 0 }
+    /// Nothing in the browser, where the page runs up behind the strip. A
+    /// web app's page starts below it instead: sites built as one fixed
+    /// screen (Telegram, Slack) never scroll, so an obscured inset can't
+    /// move them and their top would sit under the bar.
+    private var stripReserve: CGFloat {
+        WebApp.on && browser.active?.immersed != true ? Metrics.bar : 0
+    }
 
     /// Safari-Compact obscured top inset for the page (see StageView).
     ///
@@ -623,7 +654,7 @@ struct ContentView: View {
     /// No CSS is injected, so scroll, zoom, find and reader mode keep their
     /// semantics.
     private var topSafeInset: CGFloat {
-        if browser.prefs.sidebar || browser.active?.immersed == true { return 0 }
+        if WebApp.on || browser.prefs.sidebar || browser.active?.immersed == true { return 0 }
         return Metrics.strip
     }
 
@@ -811,7 +842,7 @@ struct ContentView: View {
         // Except while an address is being typed. Then the list under the field
         // is what there is to move through, and Return takes whatever the walk
         // landed on.
-        if event.keyCode == 48, !flags.contains(.command), !flags.contains(.option) {
+        if event.keyCode == 48, !flags.contains(.command), !flags.contains(.option), !WebApp.on {
             // Filling something in on the page: the key belongs to the field,
             // which may well be offering a completion to take with it.
             if !browser.fieldShowing, browser.active?.typing == true { return false }
@@ -835,6 +866,19 @@ struct ContentView: View {
 
         // Anything with ⌥ or ⌃ on top is somebody else's.
         guard !flags.contains(.option), !flags.contains(.control) else { return false }
+
+        // A web app is one site in one window: what's left of the browser's
+        // keys is what makes sense for a single page. The rest go to the page
+        // itself, which may well have a ⌘K of its own.
+        if WebApp.on {
+            let kept: Set<String> = ["f", "g", "p", "=", "+", "-", "0", "r", "[", "]", ",", "j", "w"]
+            let arrow = event.keyCode == 123 || event.keyCode == 124
+            guard kept.contains(key) || arrow, !(shifted && ["[", "]", "w"].contains(key)) else { return false }
+            if key == "w" {
+                NSApp.keyWindow?.performClose(nil)
+                return true
+            }
+        }
 
         // A taught combo wins over every default below it.
         if let taught = browser.prefs.overrideMatch(key: key, flags: flags) {
@@ -923,4 +967,109 @@ struct ContentView: View {
         }
         return true
     }
+}
+
+
+/// A web app's whole top edge: the site's own colour, the traffic lights, and
+/// somewhere to take hold of the window. No tabs — it is one site — and a
+/// click on it takes the page back to its top, as the browser's strip does.
+private struct AppStrip: View {
+    @ObservedObject var browser: Browser
+
+    var body: some View {
+        HStack(spacing: 0) {
+            DragStrip(onClick: { browser.active?.scrollToTop() })
+            HStack(spacing: Metrics.tabGap) {
+                // There from the first file on. It goes where the file went:
+                // a web app has no downloads list worth a panel of its own.
+                if !browser.downloading.isEmpty || !browser.loot.kept.isEmpty {
+                    Door(
+                        icon: browser.downloading.isEmpty ? "arrow.down.circle" : "arrow.down.circle.fill",
+                        help: "Show in Finder",
+                        tint: browser.themeColor
+                    ) {
+                        if let last = browser.loot.kept.first(where: \.stillThere) {
+                            browser.loot.reveal(last)
+                        } else {
+                            NSWorkspace.shared.open(browser.prefs.downloads)
+                        }
+                    }
+                }
+                Door(icon: "command", help: "Settings   ⌘,", tint: browser.themeColor) { browser.tuning.toggle() }
+            }
+            .padding(.trailing, 12)
+            .offset(y: Metrics.barDrop)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: Metrics.bar)
+        // The page's own title, centred as a window's is. Sites put what is
+        // worth a glance there — unread counts, who is typing.
+        .overlay {
+            if let tab = browser.active {
+                PageTitle(tab: tab, tint: browser.themeColor)
+                    .padding(.horizontal, Metrics.lights + 12)
+                    .offset(y: Metrics.barDrop)
+                    .allowsHitTesting(false)
+            }
+        }
+        // The colour of the page's own top edge; glass until it has been read.
+        .background {
+            if let tint = browser.themeColor {
+                tint.color
+            } else {
+                Glass()
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if let tint = browser.themeColor {
+                // The bar's colour is the page's edge averaged, and a wallpaper
+                // or a gradient is never quite its own average. A short fade
+                // over the top of the page takes the seam away.
+                // The same fill as the bar, faded by a mask rather than drawn
+                // as a gradient of its own: a gradient's colours don't ease
+                // the way a fill does, and the two drifted apart mid-change.
+                Rectangle().fill(tint.color)
+                    .mask(LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom))
+                    .frame(height: 18)
+                    .offset(y: 18)
+                    .allowsHitTesting(false)
+            } else {
+                Rectangle().fill(Palette.hairline).frame(height: 1)
+                    .allowsHitTesting(false)
+            }
+        }
+        // The page's own fades run in the compositor, where a picture of the
+        // page can't see them: a read gets the colour before and then the
+        // colour after. So the bar does the fade itself, over about as long
+        // as a page's overlay takes to come in.
+        .animation(.easeInOut(duration: 0.15), value: browser.themeColor)
+    }
+}
+
+/// A tab's title, watched on its own so the bar redraws when the page
+/// changes it and at no other time.
+private struct PageTitle: View {
+    @ObservedObject var tab: Tab
+    let tint: Tint?
+
+    var body: some View {
+        Text(tab.title)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(Palette.foreground(on: tint))
+            .lineLimit(1)
+            .truncationMode(.middle)
+    }
+}
+
+/// The title bar's own material, blending with what is behind the window.
+private struct Glass: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .titlebar
+        view.blendingMode = .behindWindow
+        view.state = .followsWindowActiveState
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {}
 }

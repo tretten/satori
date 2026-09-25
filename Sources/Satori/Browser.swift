@@ -37,7 +37,7 @@ final class Browser: NSObject, ObservableObject {
         if let id = activeID, let tab = tabs.first(where: { $0.id == id }) {
             tintWatch = tab.$themeColor.sink { [weak self] tint in
                 guard let self else { return }
-                self.themeColor = self.prefs.adaptive ? tint : nil
+                self.themeColor = self.prefs.adaptive || WebApp.on ? tint : nil
             }
         } else {
             tintWatch = nil
@@ -48,7 +48,7 @@ final class Browser: NSObject, ObservableObject {
     /// Re-read the active tab's tint through the adaptive gate. Called when
     /// the checkbox flips so the live UI updates without a reload.
     private func refreshTint() {
-        guard prefs.adaptive, let id = activeID,
+        guard prefs.adaptive || WebApp.on, let id = activeID,
               let tab = tabs.first(where: { $0.id == id })
         else {
             themeColor = nil
@@ -643,9 +643,16 @@ final class Browser: NSObject, ObservableObject {
         super.init()
         Shield.shared.enabled = prefs.shielded
         Shield.shared.compile()
-        if #available(macOS 15.4, *) { Extensions.shared.start(for: self) }
-        if prefs.bench { Bench.shared.start(for: self) }
-        welcoming = !prefs.welcomed
+        // A web app is one site, launched already knowing which — there is
+        // no welcome to walk through, no extensions to run (it isn't the
+        // Web Store's browser) and no local script asking it to open tabs.
+        if !WebApp.on {
+            if #available(macOS 15.4, *) { Extensions.shared.start(for: self) }
+            if prefs.bench { Bench.shared.start(for: self) }
+            WebApp.refreshRegistered()
+        }
+        welcoming = !WebApp.on && !prefs.welcomed
+        if WebApp.on { WebAppNotifyDelegate.browser = self }
 
         // The History menu lists what the history holds, and the menu is drawn
         // from this object's changes — so the history's are passed on.
@@ -720,7 +727,11 @@ final class Browser: NSObject, ObservableObject {
         defer {
             watchTint()
             follow()
-            watchForSleep()
+            // Tabs must never sleep in a web app: a hidden window losing its
+            // web view is exactly what a background notification can't
+            // survive. The main browser still puts idle tabs to bed.
+            if !WebApp.on { watchForSleep() }
+            watchEdge()
         }
 
         let saved = Session.read()
@@ -730,6 +741,14 @@ final class Browser: NSObject, ObservableObject {
             // moment after the window is up, so that the first address typed
             // finds everything already running, and the first frame never
             // had to share the CPU with it.
+            //
+            // A web app has no blank tab to offer: an empty saved session
+            // means its one tab opens straight to its own site.
+            if let start = WebApp.start {
+                adopt(Tab())
+                DispatchQueue.main.async { [weak self] in self?.tabs.first?.go(to: start) }
+                return
+            }
             let tab = Tab()
             adopt(tab)
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak tab] in
@@ -869,6 +888,15 @@ final class Browser: NSObject, ObservableObject {
         writeSession(now: true)
     }
 
+    // MARK: - make web app
+
+    /// File ▸ Make Web App…. Reads the active tab's page for a name and an
+    /// icon, then hands off to WebApp's builder. See WebApp.swift.
+    func makeWebApp() {
+        guard let tab = active, !tab.isBlank else { return }
+        WebApp.make(from: tab, browser: self)
+    }
+
     // MARK: - tabs
 
     /// ⌘T. On a tab that is already blank this just puts the cursor back in the
@@ -943,6 +971,10 @@ final class Browser: NSObject, ObservableObject {
     /// behind; closing that blank tab closes the window.
     func close(_ tab: Tab) {
         guard let index = tabs.firstIndex(where: { $0.id == tab.id }) else { return }
+        // A web app's first tab is the app. Closing it — a stray ⌘W, a page
+        // calling window.close() — would leave an empty browser where the
+        // site was. Only what it opened (a sign-in popup) can go.
+        if WebApp.on, index == 0 { return }
 
         // A tab whose page is out in the little window takes the window with
         // it. Left alone, the window would go on holding a page belonging to a
@@ -1608,6 +1640,17 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
             return
         }
 
+        // A web app is one site: a link that leaves it — clicked, not a
+        // script's window.open, which OAuth popups need to stay put — goes to
+        // the Mac's default browser instead of opening a second site inside
+        // a window that's supposed to only ever be the one.
+        if WebApp.on, action.navigationType == .linkActivated,
+           ["http", "https"].contains(scheme), !WebApp.sameSite(url) {
+            WebApp.openOutside(url)
+            decisionHandler(.cancel)
+            return
+        }
+
         // ⌘-click opens beside this tab and leaves you where you are; ⌘⇧-click
         // takes you with it. Middle-click does what ⌘-click does, for hands
         // that learned it that way.
@@ -1653,6 +1696,22 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
         for action: WKNavigationAction,
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
+        // A web app shows no tabs, so a new window has nowhere to go but
+        // three places. Another site, opened as a link would be — clicked, or
+        // window.open with no size asked for — goes to the browser. A sized
+        // popup (a sign-in window, which needs its opener) stays, on top of
+        // the site until it closes itself. The site itself opens in place.
+        if WebApp.on, let url = action.request.url, ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+            if !WebApp.sameSite(url) {
+                if action.navigationType == .linkActivated || windowFeatures.width == nil {
+                    WebApp.openOutside(url)
+                    return nil
+                }
+            } else {
+                webView.load(action.request)
+                return nil
+            }
+        }
         let from = tab(for: webView)?.id ?? activeID
         let tab = Tab(shy: tab(for: webView)?.shy ?? false, configuration: configuration)
         adopt(tab)

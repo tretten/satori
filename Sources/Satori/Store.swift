@@ -80,9 +80,21 @@ enum Store {
     /// kept — the session, the pins, the history, what is hidden on each site
     /// — moves to the new name the first time the new name runs, and the
     /// settings are copied across. Nothing is left to be lost.
+    ///
+    /// A web app is a clone of this very binary under a different bundle id,
+    /// so `testing` and the migration above must never run for it — it would
+    /// otherwise read, and then overwrite, the real browser's own session.
+    /// Its own folder is keyed by bundle id, so two web apps never share one.
     static let folder: URL = {
         let support = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        if WebApp.on {
+            let id = Bundle.main.bundleIdentifier ?? "web-app"
+            let home = support.appendingPathComponent("Satori Apps", isDirectory: true)
+                .appendingPathComponent(id, isDirectory: true)
+            try? FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+            return home
+        }
         let home = support.appendingPathComponent(world.map { "Satori (\($0))" } ?? "Satori", isDirectory: true)
         if !testing {
             let old = support.appendingPathComponent("Office Browser", isDirectory: true)
@@ -115,6 +127,11 @@ enum Store {
     /// Settings live apart too: a test that changes what the tabs wear or
     /// where the tabs go must not change yours.
     static let settings: UserDefaults = {
+        // A different bundle id already gets its own `.standard` — that's
+        // the whole trick behind a web app's isolation. It just must never
+        // carry the main browser's settings over the way a renamed Office
+        // Browser did.
+        guard !WebApp.on else { return .standard }
         guard testing else {
             carryOver(into: .standard)
             return .standard

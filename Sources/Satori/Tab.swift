@@ -39,7 +39,12 @@ enum Web {
         // did nothing at all: the page asks, and WebKit refuses without a word.
         config.preferences.isElementFullscreenEnabled = true
         config.mediaTypesRequiringUserActionForPlayback = .audio
-        if Store.testing, !Store.measuring { config.preferences.inactiveSchedulingPolicy = .none }
+        // A web app's whole point is a notification arriving while the window
+        // is hidden behind everything else, or minimised. macOS's own
+        // scheduling throttle for background windows would suspend the very
+        // timers and sockets a push depends on, so it's turned off — same
+        // knob a test run disables for measurements that need every tab awake.
+        if (Store.testing && !Store.measuring) || WebApp.on { config.preferences.inactiveSchedulingPolicy = .none }
         return config
     }
 }
@@ -263,6 +268,13 @@ final class Tab: ObservableObject, Identifiable {
     private let floats = FloatRelay()
     private let shop = StoreRelay()
     private let links = LinkRelay()
+    private let notes = NotifyRelay()
+    private let edges = EdgeRelay()
+    /// A web app's edge reading: one picture in flight, and the follow-ups
+    /// still to come (see WebApp.swift).
+    var edgeBusy = false
+    var edgeLast: CFTimeInterval = 0
+    var edgeTrail: [DispatchWorkItem] = []
     private let ears = AudioWatch()
     private var lastY: Double = 0
 
@@ -364,6 +376,8 @@ final class Tab: ObservableObject, Identifiable {
         controller.removeScriptMessageHandler(forName: FloatRelay.name)
         controller.removeScriptMessageHandler(forName: StoreRelay.name)
         controller.removeScriptMessageHandler(forName: LinkRelay.name)
+        controller.removeScriptMessageHandler(forName: NotifyRelay.name)
+        controller.removeScriptMessageHandler(forName: EdgeRelay.name)
         controller.add(relay, name: ScrollRelay.name)
         controller.add(veils_, name: VeilRelay.name)
         controller.add(images, name: ImageRelay.name)
@@ -374,6 +388,12 @@ final class Tab: ObservableObject, Identifiable {
         if !EXTENSIONS_HIDDEN { controller.add(shop, name: StoreRelay.name) }
         controller.add(links, name: LinkRelay.name)
         controller.add(forms, name: FormRelay.name)
+        // Notifications are a web app's own thing — a hundred ordinary tabs
+        // have no business posting to the Dock badge on some site's behalf.
+        if WebApp.on {
+            controller.addScriptMessageHandler(notes, contentWorld: .page, name: NotifyRelay.name)
+            controller.add(edges, name: EdgeRelay.name)
+        }
         Shield.shared.protect(controller)
         built = web
         // Eager strip inset at creation, before any load or first paint:
@@ -422,6 +442,8 @@ final class Tab: ObservableObject, Identifiable {
         floats.tab = self
         shop.tab = self
         links.tab = self
+        notes.tab = self
+        edges.tab = self
         ears.watch(web) { [weak self] on in self?.noisy = on }
         return web
     }
@@ -494,6 +516,19 @@ final class Tab: ObservableObject, Identifiable {
         controller.addUserScript(
             WKUserScript(source: LinkRelay.watch, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
         )
+        // The Notification shim — only a web app's own site gets to replace
+        // window.Notification; a hundred ordinary tabs have no native
+        // permission to speak for. removeAllUserScripts() above runs on every
+        // main-frame navigation, so this has to be re-added here each time,
+        // not once at build().
+        if WebApp.on {
+            controller.addUserScript(
+                WKUserScript(source: NotifyRelay.shim(), injectionTime: .atDocumentStart, forMainFrameOnly: true)
+            )
+            controller.addUserScript(
+                WKUserScript(source: EdgeRelay.watch, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+            )
+        }
         guard !css.isEmpty else { return }
         controller.addUserScript(
             WKUserScript(source: Veiling.style(css), injectionTime: .atDocumentStart, forMainFrameOnly: true)
@@ -614,10 +649,16 @@ final class Tab: ObservableObject, Identifiable {
     /// already waits for a frame before it says anything.
     func scrolled(to y: Double, of ceiling: Double, color: Tint?) {
         reading = ceiling > 0 ? min(1, max(0, y / ceiling)) : 0
-        if color != themeColor { themeColor = color }
+        // A web app's colour comes from its pixels instead (see WebApp.edge).
+        if !WebApp.on, color != themeColor { themeColor = color }
         let delta = y - lastY
         lastY = y
         onScroll?(self, y, delta)
+    }
+
+    /// The colour a web app's bar has read off the top of this page.
+    func wear(_ tint: Tint?) {
+        if tint != themeColor { themeColor = tint }
     }
 
     func go(to url: URL) {
@@ -926,6 +967,8 @@ final class Tab: ObservableObject, Identifiable {
     var desiredTopInset: CGFloat {
         if floating { return 0 }
         if immersed { return 0 }
+        // A web app's page starts below its bar rather than behind it.
+        if WebApp.on { return 0 }
         if let built, built.window?.level == .floating { return 0 }
         let sidebar = (Store.settings.object(forKey: "sidebar") as? Bool)
             ?? (Store.settings.string(forKey: "manner") == "side")
@@ -1018,6 +1061,8 @@ final class Tab: ObservableObject, Identifiable {
         controller.removeScriptMessageHandler(forName: FloatRelay.name)
         controller.removeScriptMessageHandler(forName: StoreRelay.name)
         controller.removeScriptMessageHandler(forName: LinkRelay.name)
+        controller.removeScriptMessageHandler(forName: NotifyRelay.name)
+        controller.removeScriptMessageHandler(forName: EdgeRelay.name)
         controller.removeAllUserScripts()
         web.onPull = nil
         web.onTouch = nil

@@ -23,6 +23,10 @@ struct Login: Identifiable, Equatable, Hashable {
 enum Vault {
     /// What every item of ours is tagged with. A test run tags its own, so a
     /// password saved while trying something never sits among the real ones.
+    /// A web app shares the browser's: the keychain keys an item by site and
+    /// account alone, so a label of its own could only ever take the
+    /// browser's password over, never sit beside it. Cookies stay apart;
+    /// the password you'd type is the same one.
     private static let label = Store.world.map { "Satori (\($0))" } ?? "Satori"
 
     // MARK: - reading
