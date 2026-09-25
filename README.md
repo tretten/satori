@@ -1,114 +1,63 @@
-# Satori
+<h1 align="center">Satori</h1>
 
-A small, fast, quiet web browser for the Mac, by [tretten](https://github.com/tretten/satori).
+<p align="center">
+  <img src="logo.png" width="128" alt="Satori App Icon">
+</p>
 
-![Satori, with its tabs down the left and a page taking the rest of the window](.github/screenshot.png)
+<p align="center">
+  A small, fast, quiet web browser for the Mac.
+</p>
 
-**[Download for macOS →](https://github.com/tretten/satori/releases/latest/download)** · macOS 14 or later · free · about 2 MB
+<p align="center">
+  <a href="https://github.com/tretten/satori/releases/latest/download/Satori.dmg">Download Satori for macOS</a>
+</p>
 
----
+## Features
 
-## What it is
+- One field: type an address to go there, words to search (DuckDuckGo by default, changeable in Settings › Search). Addresses complete from your own history; nothing is sent anywhere until you press Return.
+- Tabs across the top or down the left (`⇧⌘S`), pinned tabs, last session restored instantly, `⌘K` to switch by name.
+- Reading mode (`⇧⌘R`), hide-anything (`⇧⌘H`, per site and persistent), picture-in-picture video (`⇧⌘P`, or on its own when you leave a playing tab — off in Settings › Tabs).
+- Built-in ad and tracker blocking at the network level, on by default, off per site.
+- Passwords saved in the macOS keychain and offered under the field, never auto-filled; one-click import from Chrome, Arc, Dia, Brave, or Edge.
+- Chrome extensions on WebKit's own extension engine (macOS 15.4 or later), installable from a Web Store link; unpacked folders for development.
+- Bookmarks, history, and downloads as searchable one-keystroke panels; light, dark, or the Mac's own appearance.
+- One window — tabs are the only kind of "new" there is.
 
-Satori is a browser with nothing in the way. A row of tabs — across the top or down the left, your choice — and the page. There is no toolbar, no start page, no sidebar of suggestions, no account to sign into, nothing that wants your attention. You type an address or a few words in one field and you are on the page.
+## Privacy
 
-It uses **WebKit**, the engine already inside every Mac (it is what Safari runs on). That is why the whole app is about 5 MB on disk and opens instantly: there is no second copy of Chromium to download, update and keep in memory.
+No account, no sync, no telemetry. Passwords live in the login keychain as ordinary items tagged `Satori`; history, bookmarks, open tabs, and hidden elements are small JSON files under `~/Library/Application Support/Satori/`. Besides the pages you ask for, the only things that leave your Mac are their icons and one small update check a day.
 
-Satori is a fork of [Search by Office Commun](https://github.com/driceroland/Search) (MIT) — renamed, with its own home folder, keychain items and update feed. 悟り (satori) is the Zen moment of understanding; a pair with [kuu](https://github.com/tretten/kuu) 空, emptiness.
+## Install
 
-## What it does
+Requires macOS 14 or later.
 
-- **One field.** Type an address and you go there; type words and you search — DuckDuckGo unless you pick another engine in Settings › Search. It finishes addresses from your own history and never sends what you type anywhere until you press Return.
-- **Tabs that stay out of the way.** Pin the pages you keep open all day and they shrink to a letter or their icon. Tabs from your last session come back instantly and cost nothing until you click them. `⌘K` lists your open tabs by name.
-- **Reading mode.** `⇧⌘R` strips a page down to the article.
-- **Hide anything, for good.** `⇧⌘H`, then click a cookie banner, a newsletter overlay, a rail of "related" nonsense — it goes, and it is still gone on that site next time, before the page has drawn a single frame.
-- **An ad blocker that runs before the page.** Third-party trackers and ad networks are stopped at the network level, so there is nothing to render and nothing to slow down. On by default, off per site if something breaks.
-- **Video that follows you.** `⇧⌘P` lifts the video out of the page into a small window that stays above everything, including other apps.
-- **Passwords, in your keychain.** Satori offers to save a sign-in once it has actually worked, and offers your saved accounts under the field when you click it — the way Safari does, never filling anything on its own. Everything lives in the macOS keychain, encrypted by the system, readable only by Satori. Bring yours in from Chrome, Arc, Dia, Brave or Edge in one click; nothing leaves the Mac.
-- **Light, dark, or the Mac's own.** The frame and the pages follow.
-- **Bookmarks, history, downloads** — each a panel, each searchable, each one keystroke away.
-- **Chrome extensions, without Chrome.** Paste a Chrome Web Store link in Settings › Extensions, or open the extension's page in Satori and press Add. It runs on WebKit's own extension engine — the one Safari uses — and where Chrome has APIs WebKit doesn't (bookmarks, history, downloads, side panel, offscreen documents, fonts, notifications, speech, OAuth sign-in), Satori fills them in itself. They live behind the puzzle button; pin the ones you use often. Building your own? Load its folder as an unpacked extension and press Reload after each change, as in Chrome's developer mode. macOS 15.4 or later.
-- **Updates itself, quietly.** Once a day it checks for a newer build, downloads it, verifies it is signed by tretten, and swaps it in for the next launch. Nothing restarts on its own.
+Download `Satori.dmg` from [Releases](https://github.com/tretten/satori/releases/latest) and drag `Satori.app` to Applications. Builds are signed with a Developer ID certificate and notarized, so they open with no Gatekeeper warnings.
 
-## What it doesn't do
+Updates arrive automatically via Sparkle: once a day the app checks for a newer build, verifies it is signed by tretten, and swaps it in for the next launch. Nothing restarts on its own.
 
-On purpose:
+## Build from source
 
-- No extension you have to install to feel at home. Blocking ads, hiding clutter, reading mode, picture-in-picture and passwords are built in; extensions are there for everything else.
-- No sync, no account, no cloud. Your tabs, history and passwords are on your Mac and nowhere else.
-- No telemetry, no analytics, no crash reports sent anywhere. The only things that leave your Mac are the pages you ask for, their icons, and one small request a day to see whether there is a newer version.
-- One window. Tabs are the only kind of "new" there is.
+Requires Xcode 16 or later with the Swift 6 toolchain, on macOS 14 or later.
 
-## Privacy, concretely
-
-| What | Where it is | Who can read it |
-|---|---|---|
-| Passwords | The macOS login keychain, as ordinary keychain items tagged `Satori` | Satori, signed by tretten. Any other app triggers the system's permission dialog. |
-| History, bookmarks, open tabs, hidden elements | Small JSON files in `~/Library/Application Support/Satori/` | You. |
-| Cookies and site data | WebKit's own store for the app | The sites that set them, as in any browser. |
-| Extensions | Unpacked in `~/Library/Application Support/Satori/Extensions/`, their data in WebKit's extension store | Each extension, within the permissions you accepted when adding it. |
-| Anything else | Nowhere. There is no server. | — |
-
-A **private tab** (`⇧⌘N`) has its own cookie jar and leaves nothing behind when it closes.
-
-## Keyboard
-
-| | |
-|---|---|
-| `⌘L` address · `⌘K` switch tab · `⌘T` new tab · `⌘W` close · `⇧⌘T` reopen | `⌘[` `⌘]` back, forward · `⇧⌘[` `⇧⌘]` previous, next tab · `⌘1`–`⌘9` jump |
-| `⇧⌘S` tabs across the top or down the left · `⇧⌘B` bookmark this page | `⇧⌘R` reading mode · `⇧⌘P` float the video · `⇧⌘H` hide something · `⇧⌘U` what is hidden here |
-| `⌘F` find · `⌘D` duplicate tab · `⇧⌘C` copy address · `⇧⌘V` paste and go | `⌘Y` history · `⇧⌘J` downloads · `⌘,` settings · `⌥⌘L` passwords |
-
-`Tab` walks along the row of tabs; `esc` puts away whatever is open. Teach every shortcut another combo in Settings › Shortcuts.
-
----
-
-## For developers
-
-### Why the source is here
-
-So anyone can read exactly what a browser handling their passwords and history is doing, build it themselves, or fix something that bothers them. The code is small enough to actually read — about 12,700 lines of Swift, no dependencies beyond what Apple ships with macOS, one file per concern.
-
-### Building it
-
-- macOS 14 or later, Xcode 16 / Swift 6 toolchain
-- `swift build` — runs the app straight from the SwiftPM binary
-- `./build.sh` — assembles a real, double-clickable `Satori.app` in `build/`, ad-hoc signed so it runs on your own Mac
-
-A build you make yourself won't be notarized or carry tretten's Developer ID, so the first launch needs a right-click → Open (or an allow in System Settings → Privacy & Security). That's expected — it's the same thing that happens with any app that isn't from the App Store or a notarized DMG. Your own build also keeps its passwords apart from a signed Satori's: the keychain tells the two apart by their signatures.
-
-`./build.sh release dmg` also makes `Satori.dmg` / `Satori.zip`. `./build.sh release ship` additionally notarizes and staples — that step needs a Developer ID certificate and Apple credentials, so it only really does anything for tretten's own releases.
-
-### How it's put together
-
-- **SwiftUI** for everything drawn, **AppKit** for the handful of things SwiftUI doesn't reach on macOS (the window's title bar, dragging the window by an empty part of the tab row), **WKWebView** for pages.
-- One `Tab` per page. Its web view is built lazily — a tab restored from last session doesn't cost a process until you switch to it. That's most of why launching with twenty tabs is still instant. Each page runs in WebKit's own content process, as in Safari; a tab you close is really gone.
-- The ad blocker is a `WKContentRuleList` compiled once at launch and enforced inside WebKit's networking, before a request is made — zero cost at run time, unlike a JavaScript blocker.
-- Hidden elements are a per-site list of selectors injected as a stylesheet at document start, so nothing is ever seen appearing and vanishing.
-- Every colour is a light/dark pair in `Design.swift`, resolved by the window's appearance; nothing else in the code knows which mode it is in.
-- Extensions run on `WKWebExtension` (macOS 15.4+). `Crx.swift` fetches an extension from the Chrome Web Store's public update address and checks the CRX3 signature against the extension's id before anything is unpacked. `Extensions.swift` is the browser's side of WebKit's contract — tabs, the window, permissions, popups. `ExtensionShims.swift` adds, at install, a small script to the extension's worker, pages and content scripts: it defines the Chrome APIs WebKit lacks — `userScripts`, `privacy`, `browsingData`, `sessions`, the old FileSystem API and more — as calls answered natively by Satori, and mends the places where WebKit behaves differently from Chrome: replies from pages that don't answer, listeners added after a worker starts, workers WebKit loses track of, members and constants it leaves out. Extension pages are served from `chrome-extension://<id>/`, the address they have in Chrome, so servers and sites recognise them. `./bench ext-*` drives all of it from the shell against a test run. `ExtensionNative.swift` speaks Chrome's native messaging to hosts registered in Chrome's `NativeMessagingHosts` folders.
-- `Sources/Satori/` is one file per concern: `Vault.swift` is the keychain, `Shield.swift` the ad blocker, `Curtain.swift` the hidden elements, `Session.swift` what comes back at launch, `UpdaterController.swift` the update (Sparkle 2), `Bench.swift` the test socket, and so on. There's no framework of its own to learn first.
-
-### Testing it without closing it
-
-Turn on **Settings › General › Let a script drive Satori** and the running app listens on a Unix socket in its own folder (readable by your user only). `./bench` at the root of the repository speaks it:
-
-```
-./bench open https://example.com     # a tab of its own, at the end of your row, marked with a flask
-./bench wait 2e7e7e89                 # until it has loaded
-./bench text 2e7e7e89                 # the page's text
-./bench shot 2e7e7e89 out.png         # a picture of it
-./bench click 2e7e7e89 "button.go"    # click, type, submit — through the page's own events
-./bench probe                         # the window's state: open panels, a modal, every window
-./bench close all
+```bash
+swift build
+./build.sh
 ```
 
-Bench tabs are never selected for you, never enter the session or the history, and go when the script says so. It is how this browser is tested while somebody is using it.
+`swift build` compiles the SwiftPM binary; `./build.sh` assembles a double-clickable `Satori.app` in `build/`, ad-hoc signed so it runs on your own Mac. A self-made build is not notarized and keeps its keychain items apart from a signed Satori's, so the first launch needs right-click → Open (or an allow in System Settings → Privacy & Security).
 
-### Contributing
+`./build.sh release dmg` also makes `Satori.dmg` / `Satori.zip` plus the Sparkle `appcast.xml`; `./build.sh release ship` additionally notarizes and staples — that step needs a Developer ID certificate and Apple credentials, so it only really does anything for tretten's own releases.
 
-Issues and pull requests are genuinely welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for how this is reviewed and what tends to get merged. The short version: small changes, no new dependencies, nothing that phones home.
+The marketing version lives in `VERSION` (currently 0.8.0).
 
-### License
+## Tech notes
+
+- SwiftUI for everything drawn, AppKit for the few things SwiftUI doesn't reach (the title bar, dragging the window by an empty part of the tab row), WKWebView for pages.
+- One `Tab` per page, its web view built lazily — a restored tab costs nothing until you switch to it. Each page runs in WebKit's own content process, as in Safari.
+- The ad blocker is a `WKContentRuleList` compiled once at launch and enforced inside WebKit's networking; hidden elements are per-site selector lists injected as a stylesheet at document start.
+- Extensions run on `WKWebExtension`, with Satori filling in the Chrome APIs WebKit lacks (bookmarks, history, downloads, notifications, and more).
+- Updates ride Sparkle 2, a SwiftPM dependency embedded in the bundle.
+
+## License
 
 MIT — see [LICENSE](LICENSE). Forked from [driceroland/Search](https://github.com/driceroland/Search); the original name, icon and site remain Office Commun's.

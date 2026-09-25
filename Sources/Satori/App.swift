@@ -372,7 +372,10 @@ struct ContentView: View {
                 // is not what the field is standing over, and dimming it along
                 // with the page says otherwise.
                 .padding(.leading, sidebar ? browser.prefs.sideWidth : 0)
-                .transition(.scale(scale: 0.97).combined(with: .opacity))
+                // A fade only. Scaled along with the field, the veil over the
+                // page shrank away from the window's edges and left the strip
+                // uncovered until the very last frame.
+                .transition(.opacity)
         }
     }
 
@@ -421,9 +424,12 @@ struct ContentView: View {
     var body: some View {
         window_
             .overlay(alignment: .bottom) { bars }
-            .overlay { field }
+            // Animated on its own layer only. Hung on the whole window, the
+            // spring took in everything else that changed in the same
+            // moment — the strip redrawing for the new state above all — and
+            // that is where the opening stuttered.
+            .overlay { field.animation(Motion.field, value: browser.fieldShowing) }
             .overlay { panels }
-            .animation(Motion.settle, value: browser.fieldShowing)
             .background(WindowSetup { window = $0; dress($0) })
             .onChange(of: browser.prefs.sidebar) { _, _ in
                 DispatchQueue.main.async { measureLights() }

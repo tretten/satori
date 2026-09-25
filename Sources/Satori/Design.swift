@@ -188,6 +188,9 @@ enum Metrics {
 enum Motion {
     static let settle = Animation.spring(response: 0.30, dampingFraction: 1.0)
     static let quick = Animation.easeOut(duration: 0.14)
+    /// The address field arriving and leaving: quicker than `settle`, because
+    /// it answers a key and the hand is already waiting to type.
+    static let field = Animation.spring(response: 0.22, dampingFraction: 1.0)
 }
 
 /// Press feedback on the way down, not on release: the control answers the

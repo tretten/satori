@@ -13,6 +13,9 @@ struct Omnibox: View {
     @State private var shake: CGFloat = 0
     @State private var refused = false
     @State private var breathing = false
+    /// The field grows the last little way into place as it arrives. Only
+    /// the field: the veil over the page only fades (see `field` in App).
+    @State private var arrived = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -31,6 +34,8 @@ struct Omnibox: View {
                 if !browser.offers.isEmpty { list }
             }
             .frame(width: Metrics.fieldWidth)
+            .scaleEffect(arrived || reduceMotion ? 1 : 0.97)
+            .onAppear { withAnimation(Motion.field) { arrived = true } }
             // Lifted a little above centre: dead centre reads as low, because
             // the strip at the top isn't part of what the eye is measuring.
             .padding(.bottom, 60)
@@ -72,8 +77,13 @@ struct Omnibox: View {
             .modifier(Shake(travel: shake))
             .onAppear {
                 guard !reduceMotion else { return }
-                withAnimation(.easeInOut(duration: 2.6).repeatForever(autoreverses: true)) {
-                    breathing = true
+                // After the field has arrived: started in the same frame, the
+                // endless breath shared the entrance's transaction and dragged
+                // on it.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    withAnimation(.easeInOut(duration: 2.6).repeatForever(autoreverses: true)) {
+                        breathing = true
+                    }
                 }
             }
             .onChange(of: browser.refusals) { _, _ in

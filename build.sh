@@ -79,6 +79,28 @@ SPARKLE_FW="$(echo .build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-ar
 [ -d "$SPARKLE_FW" ] || { echo "Sparkle.framework not found — run 'swift package resolve' first" >&2; exit 1; }
 cp -R "$SPARKLE_FW" "$APP/Contents/Frameworks/Sparkle.framework"
 chmod -R u+w "$APP/Contents/Frameworks/Sparkle.framework"
+# Trim the embedded copy for the machine it runs on: this Mac is arm64-only,
+# and the framework ships fat (arm64+x86_64), with developer headers and
+# three dozen localizations the app never reads. The XCFramework source above
+# stays untouched — this thins the bundle copy only, before the inside-out
+# signing below seals the result.
+TRIM_FW="$APP/Contents/Frameworks/Sparkle.framework"
+TRIM_B="$TRIM_FW/Versions/$(readlink "$TRIM_FW/Versions/Current")"
+TRIM_TMP="$(mktemp -d)"
+n=0
+for TRIM_BIN in \
+  "$TRIM_B/Sparkle" \
+  "$TRIM_B/Autoupdate" \
+  "$TRIM_B/Updater.app/Contents/MacOS/Updater" \
+  "$TRIM_B/XPCServices/Downloader.xpc/Contents/MacOS/Downloader" \
+  "$TRIM_B/XPCServices/Installer.xpc/Contents/MacOS/Installer"; do
+  n=$((n + 1))
+  lipo -thin arm64 "$TRIM_BIN" -output "$TRIM_TMP/$n" && mv "$TRIM_TMP/$n" "$TRIM_BIN"
+done
+rm -rf "$TRIM_TMP"
+rm -rf "$TRIM_B/Headers" "$TRIM_B/Modules" "$TRIM_B/PrivateHeaders" \
+  "$TRIM_FW/Headers" "$TRIM_FW/Modules" "$TRIM_FW/PrivateHeaders"
+find "$TRIM_B/Resources" -maxdepth 1 -name "*.lproj" ! -name "Base.lproj" ! -name "en.lproj" ! -name "ru.lproj" -exec rm -rf {} +
 install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP/Contents/MacOS/$NAME" 2>/dev/null || true
 
 # Symbols stay out of the app. The linker leaves every function's name and a
