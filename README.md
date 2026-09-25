@@ -60,4 +60,4 @@ The marketing version lives in `VERSION` (currently 0.8.0).
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Forked from [driceroland/Search](https://github.com/driceroland/Search); the original name, icon and site remain Office Commun's.
+MIT. Forked from [driceroland/Search](https://github.com/driceroland/Search); the original name, icon and site remain Office Commun's.
