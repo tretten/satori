@@ -94,10 +94,28 @@ only, never for a public release — Gatekeeper will still warn on download).
 
 ```bash
 codesign --verify --deep --strict --verbose=2 build/Satori.app
-.build/artifacts/sparkle/Sparkle/bin/sign_update --verify build/appcast.xml
+EDSIG="$(python3 -c 'import sys,xml.etree.ElementTree as ET; e=ET.parse("build/appcast.xml").getroot().find(".//enclosure"); print(e.get("{http://www.andymatuschak.org/xml-namespaces/sparkle}edSignature"))')"
+.build/artifacts/sparkle/Sparkle/bin/sign_update --account "${SATORI_SPARKLE_ACCOUNT:-satori}" --verify build/Satori-<v>.zip "$EDSIG"
 xcrun stapler validate build/Satori.app
 spctl -a -vv build/Satori.app   # expect "accepted" with Developer ID origin
 ```
+
+## Feed signatures: why enclosure-only
+
+Sparkle validates the enclosure (`sparkle:edSignature` on the ZIP) against
+`SUPublicEDKey` by default. Feed-level signing is opt-in via
+`SURequireSignedFeed` (default `NO`, Sparkle 2.9+, requires
+`SUVerifyUpdateBeforeExtraction` as a prerequisite) — it would mean signing
+the `appcast.xml` itself with `sign_update` and shipping the two opt-in keys
+in `Info.plist`. This app keeps release notes embedded (`<description>`
+CDATA, no external `releaseNotesLink`) and does not opt into
+`SURequireSignedFeed`, so there is no embedded feed signature to check.
+`build.sh` and `script/release.sh` therefore verify the ZIP against the
+enclosure `edSignature` with `sign_update --account
+"${SATORI_SPARKLE_ACCOUNT:-satori}" --verify <zip> <sig>` — using the same
+keychain account `generate_appcast` signed with. `sign_update --verify
+appcast.xml` alone checks only the (absent) feed signature and always fails
+here, regardless of account.
 
 After publishing — the same checks `script/release.sh --publish` runs, by
 hand (`<v>` = version, `<build>` = `MINOR*100+PATCH`):

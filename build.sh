@@ -341,7 +341,13 @@ fi
   "$APPCAST_STAGE" >/dev/null
 cp "$APPCAST_STAGE/appcast.xml" build/appcast.xml
 rm -rf "$APPCAST_STAGE"
-"$SPARKLE_BIN/sign_update" --verify build/appcast.xml \
+# Verify the enclosure signature (what Sparkle checks by default via
+# SUPublicEDKey): no feed-level signature — SURequireSignedFeed is opt-in
+# (default NO, Sparkle 2.9+) and not enabled for this app, so there is no
+# embedded feed signature for sign_update to check.
+EDSIG="$(python3 -c 'import sys,xml.etree.ElementTree as ET; e=ET.parse("build/appcast.xml").getroot().find(".//enclosure"); print((e.get("{http://www.andymatuschak.org/xml-namespaces/sparkle}edSignature") or "") if e is not None else "")')"
+[ -n "$EDSIG" ] || { echo "no edSignature in build/appcast.xml" >&2; exit 1; }
+"$SPARKLE_BIN/sign_update" --account "$SPARKLE_ACCOUNT" --verify "$ZIP_VER" "$EDSIG" \
   && echo "appcast verified"
 echo "wrote: build/appcast.xml ($VERSION, build $BUILD)"
 echo "shipped: $DMG_VER, $ZIP_VER and build/appcast.xml — attach the versioned files and appcast.xml to the GitHub release"

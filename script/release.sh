@@ -31,6 +31,7 @@ ROOT="$(version_root)"
 
 REPO="tretten/satori"
 FEED="https://github.com/tretten/satori/releases/latest/download/appcast.xml"
+SPARKLE_ACCOUNT="${SATORI_SPARKLE_ACCOUNT:-satori}"
 # How long the live feed may lag the upload (GitHub CDN): attempts × wait.
 LIVE_RETRIES="${SATORI_LIVE_RETRIES:-12}"
 LIVE_WAIT="${SATORI_LIVE_WAIT:-10}"
@@ -99,8 +100,14 @@ local_checks() {
   fi
   SIGN_UPDATE="$(find .build/artifacts -name sign_update -type f 2>/dev/null | head -1 || true)"
   if [ -n "${SIGN_UPDATE:-}" ] && [ -x "$SIGN_UPDATE" ]; then
-    "$SIGN_UPDATE" --verify "$APPCAST" >/dev/null \
-      || die "$APPCAST failed sign_update --verify — rebuild it with ./build.sh release ship"
+    # Enclosure signature is what Sparkle checks by default (SUPublicEDKey).
+    # No feed-level signature: SURequireSignedFeed is opt-in (default NO,
+    # Sparkle 2.9+) and not enabled, so verify the ZIP against the
+    # enclosure edSignature using the same keychain account the build used.
+    EDSIG="$(python3 -c 'import sys,xml.etree.ElementTree as ET; e=ET.parse(sys.argv[1]).getroot().find(".//enclosure"); print((e.get("{http://www.andymatuschak.org/xml-namespaces/sparkle}edSignature") or "") if e is not None else "")' "$APPCAST")"
+    [ -n "$EDSIG" ] || die "$APPCAST has no enclosure edSignature — rebuild it with ./build.sh release ship"
+    "$SIGN_UPDATE" --account "$SPARKLE_ACCOUNT" --verify "$ZIP_VER" "$EDSIG" >/dev/null \
+      || die "$APPCAST enclosure signature failed to verify — rebuild it with ./build.sh release ship"
     log "appcast: EdDSA signature verified"
   else
     die "sign_update not found — run 'swift package resolve' first"
@@ -129,15 +136,15 @@ verify_live_feed() {
   log "live feed: $FEED"
   ATTEMPT=1
   while [ "$ATTEMPT" -le "$LIVE_RETRIES" ]; do
-    if curl -fsSL "$FEED" 2>/dev/null | grep -q "sparkle:version=\"$BUILD\""; then
-      log "live feed serves sparkle:version=\"$BUILD\" (attempt $ATTEMPT)"
+    if curl -fsSL "$FEED" 2>/dev/null | grep -q "<sparkle:version>$BUILD</sparkle:version>"; then
+      log "live feed serves <sparkle:version>$BUILD</sparkle:version> (attempt $ATTEMPT)"
       return 0
     fi
     log "attempt $ATTEMPT/$LIVE_RETRIES: new build not live yet — waiting ${LIVE_WAIT}s"
     sleep "$LIVE_WAIT"
     ATTEMPT=$((ATTEMPT + 1))
   done
-  die "live feed still lacks sparkle:version=\"$BUILD\" after $LIVE_RETRIES attempts"
+  die "live feed still lacks <sparkle:version>$BUILD</sparkle:version> after $LIVE_RETRIES attempts"
 }
 
 publish() {
@@ -148,7 +155,7 @@ publish() {
     printf '+ %s\n' "gh release create $TAG --repo $REPO --title 'Satori $VERSION' --notes-file <NOTES.md ## $VERSION>"
     run gh release upload "$TAG" --repo "$REPO" --clobber \
       "$DMG_VER" "$ZIP_VER" "$APPCAST"
-    log "dry-run: would download ZIP+DMG back, compare byte sizes, and poll the live feed for sparkle:version=\"$BUILD\""
+    log "dry-run: would download ZIP+DMG back, compare byte sizes, and poll the live feed for <sparkle:version>$BUILD</sparkle:version>"
     return 0
   fi
   command -v gh >/dev/null || die "gh not found (brew install gh, then gh auth login)"
