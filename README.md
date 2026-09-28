@@ -14,9 +14,9 @@
 
 ## Features
 
-- One field: type an address to go there, words to search (DuckDuckGo by default, changeable in Settings › Search). Addresses complete from your own history; nothing is sent anywhere until you press Return.
+- One field: type an address to go there, words to search (DuckDuckGo by default, changeable in Settings › Search). Addresses complete from your own history and a built-in list of popular sites, and the page you are about to open starts loading while you type (see Privacy).
 - Tabs across the top or down the left (`⇧⌘S`), pinned tabs, last session restored instantly, `⌘K` to switch by name.
-- Reading mode (`⇧⌘R`) with themes and text size, hide-anything (`⇧⌘H`, per site and persistent), picture-in-picture video (`⇧⌘P`, or on its own when you leave a playing tab, off in Settings › Tabs).
+- Reading mode (`⇧⌘R`) that finds the article on any site, with themes and text size, hide-anything (`⇧⌘H`, per site and persistent), picture-in-picture video (`⇧⌘P`, or on its own when you leave a playing tab, off in Settings › Tabs).
 - Translate Page (`⇧⌘Y`) with Apple's translator, on your Mac.
 - Listen: articles read aloud paragraph by paragraph, in the system voice, Apple's voices, or natural voices (Supertonic 3) downloaded only when you pick one.
 - With Apple Intelligence on (macOS 26): a summary of an article in its language or yours, questions about the page (`⇧⌘A`), history search by meaning, and plain explanations of pages that fail to load.
@@ -30,7 +30,13 @@
 
 ## Privacy
 
-No account, no sync, no telemetry. Passwords live in the login keychain as ordinary items tagged `Satori`; history, bookmarks, open tabs, and hidden elements are small JSON files under `~/Library/Application Support/Satori/`. Besides the pages you ask for, the only things that leave your Mac are their icons and one small update check a day. Translation, summaries and answers about a page run on the Mac. Picking a natural voice downloads its model once from Hugging Face (135 MB).
+No account, no sync, no telemetry.
+
+**What stays on your Mac, and how it is kept.** Passwords live in the login keychain as ordinary items tagged `Satori`. History, open tabs, bookmarks, downloads and hidden elements are files under `~/Library/Application Support/Satori/`, encrypted with AES-GCM under a key that Satori keeps in your login keychain, so another app or another account on the Mac reads nothing but noise. The names Satori files other things under (site icons, where reading aloud stopped, a site's background colour) are HMACs under the same key, so a folder listing doesn't say where you have been. For a site's front page, Satori keeps a picture of how it looked, shown for a moment while the page loads again: it is shrunk to 700 points and blurred before it is written, so nothing on it can be read, kept in `~/Library/Caches` (which Time Machine skips), and deleted after a day. Private tabs keep none of this.
+
+**What leaves your Mac.** The pages you ask for, their icons, and one small update check a day. Two things happen before you press Return: while you type in a new tab, the address Satori is finishing from your own history starts loading, and a single word that isn't in the dictionary (`ivinteractive`) is looked up in DNS as `ivinteractive.com` to see whether the site exists. Search words are never sent before Return. Translation, summaries and answers about a page run on the Mac with Apple's frameworks. Picking a natural voice downloads its model once from Hugging Face (135 MB).
+
+**Certificates.** Many Russian sites (Sber, Alfa-Bank, T-Bank, Gosuslugi) use certificates from the Russian Ministry of Digital Development, which macOS doesn't trust. Satori trusts that one root only for addresses in `.ru`, `.su` and `.рф`, so it can't vouch for any other site. You can turn this off in Settings › Privacy.
 
 ## Install
 
@@ -53,7 +59,7 @@ swift build
 
 `./build.sh release dmg` also makes `Satori.dmg` / `Satori.zip` plus the Sparkle `appcast.xml`; `./build.sh release ship` additionally notarizes and staples. That step needs a Developer ID certificate and Apple credentials, so it only really does anything for tretten's own releases.
 
-The marketing version lives in `VERSION` (currently 0.8.4).
+The marketing version lives in `VERSION` (currently 0.8.5).
 
 ## Tech notes
 
