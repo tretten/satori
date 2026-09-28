@@ -16,16 +16,21 @@
 
 - One field: type an address to go there, words to search (DuckDuckGo by default, changeable in Settings › Search). Addresses complete from your own history; nothing is sent anywhere until you press Return.
 - Tabs across the top or down the left (`⇧⌘S`), pinned tabs, last session restored instantly, `⌘K` to switch by name.
-- Reading mode (`⇧⌘R`), hide-anything (`⇧⌘H`, per site and persistent), picture-in-picture video (`⇧⌘P`, or on its own when you leave a playing tab — off in Settings › Tabs).
+- Reading mode (`⇧⌘R`) with themes and text size, hide-anything (`⇧⌘H`, per site and persistent), picture-in-picture video (`⇧⌘P`, or on its own when you leave a playing tab, off in Settings › Tabs).
+- Translate Page (`⇧⌘Y`) with Apple's translator, on your Mac.
+- Listen: articles read aloud paragraph by paragraph, in the system voice, Apple's voices, or natural voices (Supertonic 3) downloaded only when you pick one.
+- With Apple Intelligence on (macOS 26): a summary of an article in its language or yours, questions about the page (`⇧⌘A`), history search by meaning, and plain explanations of pages that fail to load.
+- Share a page as its link plus a card with its title, picture and address.
 - Built-in ad and tracker blocking at the network level, on by default, off per site.
 - Passwords saved in the macOS keychain and offered under the field, never auto-filled; one-click import from Chrome, Arc, Dia, Brave, or Edge.
 - Chrome extensions on WebKit's own extension engine (macOS 15.4 or later), installable from a Web Store link; unpacked folders for development.
 - Bookmarks, history, and downloads as searchable one-keystroke panels; light, dark, or the Mac's own appearance.
-- One window — tabs are the only kind of "new" there is.
+- A Develop menu when you want one (Settings › General): Web Inspector, page source, empty caches, JavaScript off per tab.
+- One window: tabs are the only kind of "new" there is.
 
 ## Privacy
 
-No account, no sync, no telemetry. Passwords live in the login keychain as ordinary items tagged `Satori`; history, bookmarks, open tabs, and hidden elements are small JSON files under `~/Library/Application Support/Satori/`. Besides the pages you ask for, the only things that leave your Mac are their icons and one small update check a day.
+No account, no sync, no telemetry. Passwords live in the login keychain as ordinary items tagged `Satori`; history, bookmarks, open tabs, and hidden elements are small JSON files under `~/Library/Application Support/Satori/`. Besides the pages you ask for, the only things that leave your Mac are their icons and one small update check a day. Translation, summaries and answers about a page run on the Mac. Picking a natural voice downloads its model once from Hugging Face (135 MB).
 
 ## Install
 
@@ -46,14 +51,14 @@ swift build
 
 `swift build` compiles the SwiftPM binary; `./build.sh` assembles a double-clickable `Satori.app` in `build/`, ad-hoc signed so it runs on your own Mac. A self-made build is not notarized and keeps its keychain items apart from a signed Satori's, so the first launch needs right-click → Open (or an allow in System Settings → Privacy & Security).
 
-`./build.sh release dmg` also makes `Satori.dmg` / `Satori.zip` plus the Sparkle `appcast.xml`; `./build.sh release ship` additionally notarizes and staples — that step needs a Developer ID certificate and Apple credentials, so it only really does anything for tretten's own releases.
+`./build.sh release dmg` also makes `Satori.dmg` / `Satori.zip` plus the Sparkle `appcast.xml`; `./build.sh release ship` additionally notarizes and staples. That step needs a Developer ID certificate and Apple credentials, so it only really does anything for tretten's own releases.
 
-The marketing version lives in `VERSION` (currently 0.8.0).
+The marketing version lives in `VERSION` (currently 0.8.4).
 
 ## Tech notes
 
 - SwiftUI for everything drawn, AppKit for the few things SwiftUI doesn't reach (the title bar, dragging the window by an empty part of the tab row), WKWebView for pages.
-- One `Tab` per page, its web view built lazily — a restored tab costs nothing until you switch to it. Each page runs in WebKit's own content process, as in Safari.
+- One `Tab` per page, its web view built lazily. A restored tab costs nothing until you switch to it. Each page runs in WebKit's own content process, as in Safari.
 - The ad blocker is a `WKContentRuleList` compiled once at launch and enforced inside WebKit's networking; hidden elements are per-site selector lists injected as a stylesheet at document start.
 - Extensions run on `WKWebExtension`, with Satori filling in the Chrome APIs WebKit lacks (bookmarks, history, downloads, notifications, and more).
 - Updates ride Sparkle 2, a SwiftPM dependency embedded in the bundle.
