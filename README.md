@@ -32,11 +32,19 @@
 
 No account, no sync, no telemetry.
 
-**What stays on your Mac, and how it is kept.** Passwords live in the login keychain as ordinary items tagged `Satori`. History, open tabs, bookmarks, downloads and hidden elements are files under `~/Library/Application Support/Satori/`, encrypted with AES-GCM under a key that Satori keeps in your login keychain, so another app or another account on the Mac reads nothing but noise. The names Satori files other things under (site icons, where reading aloud stopped, a site's background colour) are HMACs under the same key, so a folder listing doesn't say where you have been. For a site's front page, Satori keeps a picture of how it looked, shown for a moment while the page loads again: it is shrunk to 700 points and blurred before it is written, so nothing on it can be read, kept in `~/Library/Caches` (which Time Machine skips), and deleted after a day. Private tabs keep none of this.
+### What stays on your Mac
 
-**What leaves your Mac.** The pages you ask for, their icons, and one small update check a day. Two things happen before you press Return: while you type in a new tab, the address Satori is finishing from your own history starts loading, and a single word that isn't in the dictionary is looked up in DNS with .com added, to see whether such a site exists. Search words are never sent before Return. Translation, summaries and answers about a page run on the Mac with Apple's frameworks. Picking a natural voice downloads its model once from Hugging Face (135 MB).
+Passwords live in the login keychain as ordinary items tagged `Satori`. History, open tabs, bookmarks, downloads and hidden elements are files under `~/Library/Application Support/Satori/`. They are encrypted with AES-GCM under a key Satori keeps in your login keychain, so other apps and other accounts on the Mac can't read them. Site icons, reading-aloud positions and site background colours are filed under HMACs made with the same key, so a folder listing doesn't show where you have been.
 
-**Certificates.** Many Russian sites (Sber, Alfa-Bank, T-Bank, Gosuslugi) use certificates from the Russian Ministry of Digital Development, which macOS doesn't trust. Satori trusts that one root only for addresses in `.ru`, `.su` and `.рф`, so it can't vouch for any other site. You can turn this off in Settings › Privacy.
+When you open a site's front page, Satori keeps a picture of it to show for a moment the next time it loads. The picture is shrunk to 700 points wide and blurred before it is saved, so nothing on it can be read. It is kept in `~/Library/Caches`, which Time Machine skips, and deleted after a day. Private tabs keep none of this.
+
+### What leaves your Mac
+
+The pages you ask for, their icons, and one small update check a day. Two things happen before you press Return. In a new tab, the address Satori is completing from your history starts loading. And a single word that isn't in the dictionary is looked up in DNS with .com added, to see whether that site exists. Search words are never sent before Return. Translation, summaries and answers about a page run on the Mac with Apple's frameworks. Picking a natural voice downloads its model from Hugging Face once (135 MB).
+
+### Certificates
+
+Many Russian sites, including Sber, Alfa-Bank, T-Bank and Gosuslugi, use certificates from the Russian Ministry of Digital Development, which macOS doesn't trust. Satori trusts that root only for addresses ending in `.ru`, `.su` and `.рф`, so it can't vouch for any other site. You can turn this off in Settings › Privacy.
 
 ## Install
 
