@@ -15,14 +15,14 @@
 ## Features
 
 - One field: type an address to go there, words to search (DuckDuckGo by default, changeable in Settings › Search). Addresses complete from your own history and a built-in list of popular sites, and the page you are about to open starts loading while you type (see Privacy).
-- Tabs across the top or down the left (`⇧⌘S`), pinned tabs, last session restored instantly, `⌘K` to switch by name.
+- Tabs across the top or down the left (`⇧⌘S`), pinned tabs, last session restored instantly, `⌘K` to switch by name, and two tabs side by side (`⌘\`) with a divider you can drag.
 - Reading mode (`⇧⌘R`) that finds the article on any site, with themes and text size, hide-anything (`⇧⌘H`, per site and persistent), picture-in-picture video (`⇧⌘P`, or on its own when you leave a playing tab, off in Settings › Tabs).
 - Translate Page (`⇧⌘Y`) with Apple's translator, on your Mac.
 - Listen: articles read aloud paragraph by paragraph, in the system voice, Apple's voices, or natural voices (Supertonic 3) downloaded only when you pick one.
 - With Apple Intelligence on (macOS 26): a summary of an article in its language or yours, questions about the page (`⇧⌘A`), history search by meaning, and plain explanations of pages that fail to load.
 - Share a page as its link plus a card with its title, picture and address.
 - Built-in ad and tracker blocking at the network level, on by default, off per site.
-- Passwords saved in the macOS keychain and offered under the field, never auto-filled; one-click import from Chrome, Arc, Dia, Brave, or Edge.
+- Passwords saved in the macOS keychain and offered under the field, never auto-filled; sign-in dialogs of password-protected folders can remember theirs; one-click import from Chrome, Arc, Dia, Brave, or Edge.
 - Chrome extensions on WebKit's own extension engine (macOS 15.4 or later), installable from a Web Store link; unpacked folders for development.
 - Bookmarks, history, and downloads as searchable one-keystroke panels; light, dark, or the Mac's own appearance.
 - A Develop menu when you want one (Settings › General): Web Inspector, page source, empty caches, JavaScript off per tab.
@@ -67,7 +67,7 @@ swift build
 
 `./build.sh release dmg` also makes `Satori.dmg` / `Satori.zip` plus the Sparkle `appcast.xml`; `./build.sh release ship` additionally notarizes and staples. That step needs a Developer ID certificate and Apple credentials, so it only really does anything for tretten's own releases.
 
-The marketing version lives in `VERSION` (currently 0.8.5).
+The marketing version lives in `VERSION` (currently 0.8.6).
 
 ## Tech notes
 
