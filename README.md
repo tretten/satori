@@ -21,7 +21,7 @@
 - Listen: articles read aloud paragraph by paragraph, in the system voice, Apple's voices, or natural voices (Supertonic 3) downloaded only when you pick one.
 - With Apple Intelligence on (macOS 26): a summary of an article in its language or yours, questions about the page (`⇧⌘A`), history search by meaning, and plain explanations of pages that fail to load.
 - Share a page as its link plus a card with its title, picture and address.
-- Built-in ad and tracker blocking at the network level, on by default, off per site.
+- Built-in ad and tracker blocking at the network level, on by default, off per site, which also drops heavy scripts of no use to the reader and holds embedded YouTube players until you press play. Cookie banners are answered "no" for you.
 - Passwords saved in the macOS keychain and offered under the field, never auto-filled; sign-in dialogs of password-protected folders can remember theirs; one-click import from Chrome, Arc, Dia, Brave, or Edge.
 - Chrome extensions on WebKit's own extension engine (macOS 15.4 or later), installable from a Web Store link; unpacked folders for development.
 - Bookmarks, history, and downloads as searchable one-keystroke panels; light, dark, or the Mac's own appearance.
@@ -67,7 +67,7 @@ swift build
 
 `./build.sh release dmg` also makes `Satori.dmg` / `Satori.zip` plus the Sparkle `appcast.xml`; `./build.sh release ship` additionally notarizes and staples. That step needs a Developer ID certificate and Apple credentials, so it only really does anything for tretten's own releases.
 
-The marketing version lives in `VERSION` (currently 0.8.6).
+The marketing version lives in `VERSION` (currently 0.8.7).
 
 ## Tech notes
 
