@@ -24,7 +24,7 @@
 - Built-in ad and tracker blocking at the network level, on by default, off per site, which also drops heavy scripts of no use to the reader and holds embedded YouTube players until you press play. Cookie banners are answered "no" for you, except on the sites you exempt.
 - Passwords saved in the macOS keychain and offered under the field, never auto-filled; sign-in dialogs of password-protected folders can remember theirs; one-click import from Chrome, Arc, Dia, Brave, or Edge.
 - Chrome extensions on WebKit's own extension engine (macOS 15.4 or later), installable from a Web Store link; unpacked folders for development.
-- Bookmarks, history, and downloads as searchable one-keystroke panels; light, dark, or the Mac's own appearance.
+- Bookmarks, history, and downloads as searchable one-keystroke panels (the downloads list clears itself after the time you choose); light, dark, or the Mac's own appearance.
 - A Develop menu when you want one (Settings › General): Web Inspector, page source, empty caches, JavaScript off per tab.
 - One window: tabs are the only kind of "new" there is.
 
