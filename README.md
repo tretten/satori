@@ -15,8 +15,9 @@
 ## Features
 
 - One field: type an address to go there, words to search (DuckDuckGo by default, changeable in Settings › Search). Addresses complete from your own history and a built-in list of popular sites, and the page you are about to open starts loading while you type (see Privacy).
+- A top bar in each site's own colour, remembered, so a site you have been to opens in its colour and develops out of it as it loads; a ring around the tab's icon while it loads.
 - Tabs across the top or down the left (`⇧⌘S`), pinned tabs, last session restored instantly, `⌘K` to switch by name, and two tabs side by side (`⌘\`) with a divider you can drag.
-- Reading mode (`⇧⌘R`) that finds the article on any site, with themes and text size, hide-anything (`⇧⌘H`, per site and persistent), picture-in-picture video (`⇧⌘P`, or on its own when you leave a playing tab, off in Settings › Tabs).
+- Reading mode (`⇧⌘R`) that finds the article on any site, with themes and text size, hide-anything (`⇧⌘H`, per site and persistent), picture-in-picture video (`⇧⌘P`, or on its own when you leave a tab playing video with sound, off in Settings › Tabs), and a click on a tab's speaker to mute it.
 - Translate Page (`⇧⌘Y`) with Apple's translator, on your Mac.
 - Listen: articles read aloud paragraph by paragraph, in the system voice, Apple's voices, or natural voices (Supertonic 3) downloaded only when you pick one.
 - With Apple Intelligence on (macOS 26): a summary of an article in its language or yours, questions about the page (`⇧⌘A`), history search by meaning, and plain explanations of pages that fail to load.
@@ -34,9 +35,7 @@ No account, no sync, no telemetry.
 
 ### What stays on your Mac
 
-Passwords live in the login keychain as ordinary items tagged `Satori`. History, open tabs, bookmarks, downloads and hidden elements are files under `~/Library/Application Support/Satori/`. They are encrypted with AES-GCM under a key Satori keeps in your login keychain, so other apps and other accounts on the Mac can't read them. Site icons, reading-aloud positions and site background colours are filed under HMACs made with the same key, so a folder listing doesn't show where you have been.
-
-When you open a site's front page, Satori keeps a picture of it to show for a moment the next time it loads. The picture is shrunk to 700 points wide and blurred before it is saved, so nothing on it can be read. It is kept in `~/Library/Caches`, which Time Machine skips, and deleted after a day. Private tabs keep none of this.
+Passwords live in the login keychain as ordinary items tagged `Satori`. History, open tabs, bookmarks, downloads and hidden elements are files under `~/Library/Application Support/Satori/`. They are encrypted with AES-GCM under a key Satori keeps in your login keychain, so other apps and other accounts on the Mac can't read them. Site icons, reading-aloud positions and site colours are filed under HMACs made with the same key, so a folder listing doesn't show where you have been. Private tabs add nothing to any of them.
 
 ### What leaves your Mac
 
