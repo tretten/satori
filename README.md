@@ -15,12 +15,13 @@
 ## Features
 
 - One field: type an address to go there, words to search (DuckDuckGo by default, changeable in Settings › Search). Addresses complete from your own history and a built-in list of popular sites, and the page you are about to open starts loading while you type (see Privacy).
-- A top bar in each site's own colour, remembered, so a site you have been to opens in its colour and develops out of it as it loads; a ring around the tab's icon while it loads.
+- A top bar (or sidebar) in each site's own colour, remembered, so a site you have been to opens in its colour and develops out of it as it loads; a ring around the tab's icon while it loads.
 - Tabs across the top or down the left (`⇧⌘S`), pinned tabs, last session restored instantly, `⌘K` to switch by name, and two tabs side by side (`⌘\`) with a divider you can drag.
+- Spaces: up to nine sets of tabs in one window, each with its own name, icon and keys (`⌥⌘1` to `⌥⌘9` by default, or your own). Switch from the button after the traffic lights or with a two-finger swipe across the tabs; to move a tab, drag it onto the button and pick a space.
 - Reading mode (`⇧⌘R`) that finds the article on any site, with themes and text size, hide-anything (`⇧⌘H`, per site and persistent), picture-in-picture video (`⇧⌘P`, or on its own when you leave a tab playing video with sound, off in Settings › Tabs), and a click on a tab's speaker to mute it.
 - Translate Page (`⇧⌘Y`) with Apple's translator, on your Mac.
 - Listen: articles read aloud paragraph by paragraph, in the system voice, Apple's voices, or natural voices (Supertonic 3) downloaded only when you pick one.
-- With Apple Intelligence on (macOS 26): a summary of an article in its language or yours, questions about the page (`⇧⌘A`), history search by meaning, and plain explanations of pages that fail to load.
+- With Apple Intelligence on (macOS 26): a summary of an article in its language or yours, history search by meaning, and plain explanations of pages that fail to load.
 - Share a page as its link plus a card with its title, picture and address.
 - Built-in ad and tracker blocking at the network level, on by default, off per site, which also drops heavy scripts of no use to the reader and holds embedded YouTube players until you press play. Cookie banners are answered "no" for you, except on the sites you exempt.
 - Passwords saved in the macOS keychain and offered under the field, never auto-filled; sign-in dialogs of password-protected folders can remember theirs; one-click import from Chrome, Arc, Dia, Brave, or Edge.
@@ -39,7 +40,7 @@ Passwords live in the login keychain as ordinary items tagged `Satori`. History,
 
 ### What leaves your Mac
 
-The pages you ask for, their icons, and one small update check a day. Two things happen before you press Return. In a new tab, the address Satori is completing from your history starts loading. And a single word that isn't in the dictionary is looked up in DNS with .com added, to see whether that site exists. Search words are never sent before Return. Translation, summaries and answers about a page run on the Mac with Apple's frameworks. Picking a natural voice downloads its model from Hugging Face once (135 MB).
+The pages you ask for, their icons, and one small update check a day. Two things happen before you press Return. In a new tab, the address Satori is completing from your history starts loading. And a single word that isn't in the dictionary is looked up in DNS with .com added, to see whether that site exists. Search words are never sent before Return. Translation and summaries run on the Mac with Apple's frameworks. Picking a natural voice downloads its model from Hugging Face once (135 MB).
 
 ### Certificates
 
