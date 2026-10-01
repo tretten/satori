@@ -16,7 +16,7 @@
 
 - One field: type an address to go there, words to search (DuckDuckGo by default, changeable in Settings › Search). Addresses complete from your own history and a built-in list of popular sites, and the page you are about to open starts loading while you type (see Privacy).
 - A top bar (or sidebar) in each site's own colour, remembered, so a site you have been to opens in its colour and develops out of it as it loads; a ring around the tab's icon while it loads.
-- Tabs across the top or down the left (`⇧⌘S`), pinned tabs, last session restored instantly, `⌘K` to switch by name, and two tabs side by side (`⌘\`, or drag a tab onto another tab or onto the page) with a divider you can drag.
+- Tabs across the top or down the left (`⇧⌘S`), pinned tabs, idle tabs put to sleep after half an hour unless set to Keep Awake, last session restored instantly, `⌘K` to switch by name, and two tabs side by side (`⌘\`, or drag a tab onto another tab or onto the page) with a divider you can drag.
 - Spaces: up to nine sets of tabs in one window, each with its own name and icon. `⌘1` to `⌘9` switch spaces and `⌥1` to `⌥9` pick tabs (both changeable in Settings), and `⌥⌘←` / `⌥⌘→` step through them. Switch from the button after the traffic lights or with a two-finger swipe across the tabs; ⌘K finds open tabs in every space. A new space asks for its name and icon first. To move a tab, drag it onto the button and pick a space.
 - Reading mode (`⇧⌘R`) that finds the article on any site, with themes and text size, hide-anything (`⇧⌘H`, per site and persistent), picture-in-picture video (`⇧⌘P`, or on its own when you leave a tab playing video with sound, off in Settings › Tabs), and a click on a tab's speaker to mute it.
 - Translate Page (`⇧⌘Y`) with Apple's translator, on your Mac.
@@ -36,7 +36,7 @@ No account, no sync, no telemetry.
 
 ### What stays on your Mac
 
-Passwords live in the login keychain as ordinary items tagged `Satori`. History, open tabs, bookmarks, downloads and hidden elements are files under `~/Library/Application Support/Satori/`. They are encrypted with AES-GCM under a key Satori keeps in your login keychain, so other apps and other accounts on the Mac can't read them. Site icons, reading-aloud positions and site colours are filed under HMACs made with the same key, so a folder listing doesn't show where you have been. Private tabs add nothing to any of them.
+Passwords live in the login keychain as ordinary items tagged `Satori`. History, open tabs, bookmarks, downloads and hidden elements are files under `~/Library/Application Support/Satori/`. They are encrypted with AES-GCM under a key Satori keeps in your login keychain, so other apps and other accounts on the Mac can't read them. Site icons, reading-aloud positions and site colours are filed under HMACs made with the same key, so a folder listing doesn't show where you have been. Private tabs add nothing to any of them, except what you hide in one: that is kept so it stays hidden next time, filed under an HMAC of the site's name rather than the name.
 
 ### What leaves your Mac
 
