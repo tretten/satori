@@ -16,10 +16,10 @@
 
 - One field: type an address to go there, words to search (DuckDuckGo by default, changeable in Settings › Search). Addresses complete from your own history and a built-in list of popular sites, and the page you are about to open starts loading while you type (see Privacy).
 - A top bar (or sidebar) in each site's own colour, remembered, so a site you have been to opens in its colour and develops out of it as it loads; a ring around the tab's icon while it loads.
-- Tabs across the top or down the left (`⇧⌘S`), pinned tabs, idle tabs put to sleep after half an hour unless set to Keep Awake, last session restored instantly, `⌘K` to switch by name, and two tabs side by side (`⌘\`, or drag a tab onto another tab or onto the page) with a divider you can drag.
+- Tabs across the top or down the left (`⇧⌘S`), pinned tabs, idle tabs put to sleep after half an hour unless set to Keep Awake, last session restored instantly, `⌘K` to switch by name, and two tabs side by side (drag a tab onto another tab or onto the page, or give it a shortcut in Settings › Shortcuts) with a divider you can drag.
 - Spaces: up to nine sets of tabs in one window, each with its own name and icon. `⌘1` to `⌘9` switch spaces and `⌥1` to `⌥9` pick tabs (both changeable in Settings), and `⌥⌘←` / `⌥⌘→` step through them. Switch from the button after the traffic lights or with a two-finger swipe across the tabs; ⌘K finds open tabs in every space. A new space asks for its name and icon first. To move a tab, drag it onto the button and pick a space.
 - Reading mode (`⇧⌘R`) that finds the article on any site, with themes and text size, hide-anything (`⇧⌘H`, per site and persistent), picture-in-picture video (`⇧⌘P`, or on its own when you leave a tab playing video with sound, off in Settings › Tabs), and a click on a tab's speaker to mute it.
-- Translate Page (`⇧⌘Y`) with Apple's translator, on your Mac.
+- Translate Page (`⇧⌘Y`, or the globe beside Settings) with Apple's translator, on your Mac. Right-click the globe to choose the language for a site.
 - Listen: articles read aloud paragraph by paragraph, in the system voice, Apple's voices, or natural voices (Supertonic 3) downloaded only when you pick one.
 - With Apple Intelligence on (macOS 26): a summary of an article in its language or yours, history search by meaning, and plain explanations of pages that fail to load.
 - Share a page as its link plus a card with its title, picture and address.
@@ -44,7 +44,7 @@ The pages you ask for, their icons, and one small update check a day. Two things
 
 ### Certificates
 
-Many Russian sites, including Sber, Alfa-Bank, T-Bank and Gosuslugi, use certificates from the Russian Ministry of Digital Development, which macOS doesn't trust. Satori trusts that root only for addresses ending in `.ru`, `.su` and `.рф`, so it can't vouch for any other site. You can turn this off in Settings › Privacy.
+Many Russian sites, including Sber, Alfa-Bank, T-Bank and Gosuslugi, use certificates from the Russian Ministry of Digital Development, which macOS doesn't trust. Satori trusts that root only for addresses ending in `.ru`, `.su` and `.рф`, so it can't vouch for any other site. You can turn this off in Settings › Privacy & Security.
 
 ## Install
 
@@ -67,7 +67,7 @@ swift build
 
 `./build.sh release dmg` also makes `Satori.dmg` / `Satori.zip` plus the Sparkle `appcast.xml`; `./build.sh release ship` additionally notarizes and staples. That step needs a Developer ID certificate and Apple credentials, so it only really does anything for tretten's own releases.
 
-The marketing version lives in `VERSION` (currently 0.8.8).
+The marketing version lives in `VERSION` (currently 0.9.3).
 
 ## Tech notes
 
