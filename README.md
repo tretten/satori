@@ -5,30 +5,71 @@
 </p>
 
 <p align="center">
-  A small, fast, quiet web browser for the Mac.
+  <b>Small. Fast. Quiet.</b><br>
+  A web browser for the Mac that stays out of your way.
 </p>
 
 <p align="center">
   <a href="https://github.com/tretten/satori/releases/latest/download/Satori.dmg"><img src="https://github.com/tretten/screenkit/raw/main/download-macos.svg" alt="Download Satori for macOS"></a>
 </p>
 
-## Features
+## One field. That's the whole address bar.
 
-- One field: type an address to go there, words to search (DuckDuckGo by default, changeable in Settings › Search). Addresses complete from your own history and a built-in list of popular sites, and the page you are about to open starts loading while you type (see Privacy).
-- A top bar (or sidebar) in each site's own colour, remembered, so a site you have been to opens in its colour and develops out of it as it loads; a ring around the tab's icon while it loads.
-- Tabs across the top or down the left (`⇧⌘S`), pinned tabs, idle tabs put to sleep after half an hour unless set to Keep Awake, last session restored instantly, `⌘K` to switch by name, and two tabs side by side (drag a tab onto another tab or onto the page, or give it a shortcut in Settings › Shortcuts) with a divider you can drag.
-- Spaces: up to nine sets of tabs in one window, each with its own name and icon. `⌘1` to `⌘9` switch spaces and `⌥1` to `⌥9` pick tabs (both changeable in Settings), and `⌥⌘←` / `⌥⌘→` step through them. Switch from the button after the traffic lights or with a two-finger swipe across the tabs; ⌘K finds open tabs in every space. A new space asks for its name and icon first. To move a tab, drag it onto the button and pick a space.
-- Reading mode (`⇧⌘R`) that finds the article on any site, with themes and text size, hide-anything (`⇧⌘H`, per site and persistent), picture-in-picture video (`⇧⌘P`, or on its own when you leave a tab playing video with sound, off in Settings › Tabs), and a click on a tab's speaker to mute it.
-- Translate Page (`⇧⌘Y`, or the globe beside Settings) with Apple's translator, on your Mac. Right-click the globe to choose the language for a site.
-- Listen: articles read aloud paragraph by paragraph, in the system voice, Apple's voices, or natural voices (Supertonic 3) downloaded only when you pick one.
-- With Apple Intelligence on (macOS 26): a summary of an article in its language or yours, history search by meaning, and plain explanations of pages that fail to load.
-- Share a page as its link plus a card with its title, picture and address.
-- Built-in ad and tracker blocking at the network level, on by default, off per site, which also drops heavy scripts of no use to the reader and holds embedded YouTube players until you press play. Cookie banners are answered "no" for you, except on the sites you exempt.
-- Passwords saved in the macOS keychain and offered under the field, never auto-filled; sign-in dialogs of password-protected folders can remember theirs; one-click import from Chrome, Arc, Dia, Brave, or Edge.
-- Chrome extensions on WebKit's own extension engine (macOS 15.4 or later), installable from a Web Store link; unpacked folders for development.
-- Bookmarks, history, and downloads as searchable one-keystroke panels (the downloads list clears itself after the time you choose); light, dark, or the Mac's own appearance.
-- A Develop menu when you want one (Settings › General): Web Inspector, page source, empty caches, JavaScript off per tab.
-- One window: tabs are the only kind of "new" there is.
+Type an address to go there, words to search (DuckDuckGo by default, changeable in Settings › Search). Addresses complete from your own history and a built-in list of popular sites, and the page you are about to open starts loading while you type (see Privacy). Addresses in other alphabets show as written (пример.рф); lookalike spellings stay in xn-- form, so a fake can't pass for the real site.
+
+**Site colours.** A top bar (or sidebar) wears each site's own colour, remembered. A site you have been to opens in its colour and develops out of it as it loads, and the window under the page wears it too. A ring around the tab's icon shows loading.
+
+## Tabs, the way you work.
+
+**Tabs your way.** Across the top or down the left (`⇧⌘S`). Pinned tabs keep their place. Idle tabs sleep after half an hour, unless you set them to Keep Awake or they hold music or a film paused. The last session comes back instantly. `⌘K` switches by name.
+
+**Spaces.** Up to nine sets of tabs in each window, each with its own name and icon. `⌘1` to `⌘9` switch spaces and `⌥1` to `⌥9` pick tabs (both changeable in Settings), and `⌥⌘←` / `⌥⌘→` step through them. Switch from the button after the traffic lights or with a two-finger swipe across the tabs. `⌘K` finds open tabs in every space.
+
+**Side by side.** Drag a tab onto another tab or onto the page, or give it a shortcut in Settings › Shortcuts. A divider you can drag sets the width.
+
+**Many at once.** `⌘`- or `⇧`-click several tabs to copy, bookmark as one folder, move or close them together. Ten or more tabs unopened for a week are offered for closing.
+
+**Windows.** `⌘N` opens another, each with its own tabs and spaces. Move a tab between windows from its menu or by dragging it out past the window's edge. Quit and reopen, and every window comes back; File › Reopen Closed Window returns the last one you closed.
+
+## Room for the page.
+
+**Focus** (`⌃⌘S`). The tabs and the bar step aside and come back when you point at the edge.
+
+**Reading mode** (`⇧⌘R`). Finds the article on any site, with themes and text size.
+
+**Listen.** Articles read aloud paragraph by paragraph, in the system voice, Apple's voices, or natural voices (Supertonic 3) downloaded only when you pick one.
+
+**Translate Page** (`⇧⌘Y`, or the globe beside Settings). Uses Apple's translator, on your Mac. Right-click the globe to choose the language for a site.
+
+**Picture-in-picture** (`⇧⌘P`). Or on its own when you leave a tab playing video with sound (off in Settings › Tabs). Click a tab's speaker to mute it, or Mute in its menu to keep a whole site silent.
+
+**Hide anything** (`⇧⌘H`). Per site, and it stays hidden.
+
+**Apple Intelligence** (macOS 26). A summary of an article in its language or yours, and history search by meaning.
+
+## Quiet by default.
+
+**Ads and trackers** are blocked at the network level, on by default and off per site. That also drops heavy scripts of no use to the reader and holds embedded YouTube players until you press play.
+
+**Cookie banners** are answered "no" for you, except on the sites you exempt.
+
+**Private tabs** turn the whole window dark while they are in front.
+
+**Copy Address** (`⇧⌘C`) strips tracking tags and click ids. Copy Original Address keeps them, and `⌥⇧⌘C` copies a Markdown link. Share sends a page as its link plus a card with its title, picture and address.
+
+**Passwords** are saved in the macOS keychain and offered under the field, never auto-filled. Sign-in dialogs of password-protected folders can remember theirs. Import from Chrome, Arc, Dia, Brave or Edge in one click.
+
+## Made for the Mac.
+
+**Kensho.** Links from other apps open in a small window first, with the address on top and Open in Satori (`⌘O`) to keep the page. `⌘⌥N` opens an empty one from any app, and `⌘F` finds on its page. Settings › General turns it off.
+
+**Chrome extensions** run on WebKit's own extension engine (macOS 15.4 or later) and install from a Web Store link. Unpacked folders work for development.
+
+**Panels.** Bookmarks, history and downloads open as searchable one-keystroke panels. The downloads list clears itself after the time you choose. Light, dark, or the Mac's own appearance.
+
+**Develop menu**, when you want one (Settings › General): Web Inspector (also `F12`), JavaScript console, page source, empty caches, JavaScript off per tab.
+
+**Local files** open from Finder or a path typed into the address bar. A web app stays one window.
 
 ## Privacy
 
@@ -36,7 +77,7 @@ No account, no sync, no telemetry.
 
 ### What stays on your Mac
 
-Passwords live in the login keychain as ordinary items tagged `Satori`. History, open tabs, bookmarks, downloads and hidden elements are files under `~/Library/Application Support/Satori/`. They are encrypted with AES-GCM under a key Satori keeps in your login keychain, so other apps and other accounts on the Mac can't read them. Site icons, reading-aloud positions and site colours are filed under HMACs made with the same key, so a folder listing doesn't show where you have been. Private tabs add nothing to any of them, except what you hide in one: that is kept so it stays hidden next time, filed under an HMAC of the site's name rather than the name.
+Passwords live in the login keychain as ordinary items tagged `Satori`. History, open tabs, bookmarks, downloads and hidden elements are files under `~/Library/Application Support/Satori/`. They are encrypted with AES-GCM under a key Satori keeps in your login keychain, so other apps and other accounts on the Mac can't read them. Site icons, reading-aloud positions, site colours and muted sites are filed under HMACs made with the same key, so a folder listing doesn't show where you have been. Private tabs add nothing to any of them, except what you hide in one: that is kept so it stays hidden next time, filed under an HMAC of the site's name rather than the name.
 
 ### What leaves your Mac
 
@@ -67,7 +108,7 @@ swift build
 
 `./build.sh release dmg` also makes `Satori.dmg` / `Satori.zip` plus the Sparkle `appcast.xml`; `./build.sh release ship` additionally notarizes and staples. That step needs a Developer ID certificate and Apple credentials, so it only really does anything for tretten's own releases.
 
-The marketing version lives in `VERSION` (currently 0.9.3).
+The marketing version lives in `VERSION` (currently 0.10.5).
 
 ## Tech notes
 
@@ -79,4 +120,4 @@ The marketing version lives in `VERSION` (currently 0.9.3).
 
 ## License
 
-MIT. Forked from [driceroland/Search](https://github.com/driceroland/Search); the original name, icon and site remain Office Commun's.
+Satori's own code is MIT (see `LICENSE`). Bundled third-party components retain their own licenses; see `Third-Party-Notices.txt`. The app bundle includes the corresponding license texts.
