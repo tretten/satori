@@ -1,0 +1,48 @@
+Satori
+Satori's own code is licensed under MIT, see LICENSE-Satori.txt.
+
+driceroland/Search
+Satori began as a fork of driceroland/Search, which is licensed under the MIT
+License. Its copyright notice and permission notice follow.
+https://github.com/driceroland/Search
+
+MIT License
+
+Copyright (c) 2026 Office Commun
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Mozilla Readability
+Satori embeds Mozilla Readability, based on Arc90's readability.js 1.7.1.
+The embedded source retains its original notices, including Copyright (c) 2010
+Arc90 Inc. It is licensed under Apache License 2.0; see Apache-2.0.txt.
+https://github.com/mozilla/readability
+
+Sparkle
+Satori includes Sparkle. Its license and notices for third-party code
+included by Sparkle are in Sparkle-LICENSE.txt.
+https://github.com/sparkle-project/Sparkle
+
+Supertonic 3
+Satori's read-aloud voices use Supertonic 3: Supertone's model weights,
+converted to Core ML by FluidInference. They are not part of the app; they are
+downloaded on request from Hugging Face and run by the system's Core ML. The
+weights are licensed under OpenRAIL-M, which carries use restrictions; read
+the license text before relying on them.
+https://huggingface.co/FluidInference/supertonic-3-coreml
