@@ -5,8 +5,8 @@
 </p>
 
 <p align="center">
-  <b>Small. Fast. Quiet.</b><br>
-  A web browser for the Mac that stays out of your way.
+  <b>Light. Fast. Quiet.</b><br>
+  A browser that gives you room to think.
 </p>
 
 <p align="center">
@@ -15,25 +15,27 @@
 
 ## One field. That's the whole address bar.
 
-Type an address to go there, words to search (DuckDuckGo by default, changeable in Settings › Search). Addresses complete from your own history and a built-in list of popular sites, and the page you are about to open starts loading while you type (see Privacy). Addresses in other alphabets show as written (пример.рф); lookalike spellings stay in xn-- form, so a fake can't pass for the real site.
+Type an address to go there, words to search (DuckDuckGo by default, changeable in Settings › Search). Addresses complete from your own history and a built-in list of popular sites, and the page you are about to open starts loading while you type (see Privacy). Addresses in other alphabets show as written (пример.рф); lookalike spellings stay in xn-- form, so a fake can't pass for the real site. With the field empty and a link on the clipboard, **Open copied link** is offered as the first row; it opens links only, never a search.
 
-**Site colours.** A top bar (or sidebar) wears each site's own colour, remembered. A site you have been to opens in its colour and develops out of it as it loads, and the window under the page wears it too. A ring around the tab's icon shows loading.
+**Site colors.** A top bar (or sidebar) wears each site's own color, remembered. A site you have been to opens in its color and develops out of it as it loads, and the window under the page wears it too. A ring around the tab's icon shows loading.
 
 ## Tabs, the way you work.
 
-**Tabs your way.** Across the top or down the left (`⇧⌘S`). Pinned tabs keep their place. Idle tabs sleep after half an hour, unless you set them to Keep Awake or they hold music or a film paused. The last session comes back instantly. `⌘K` switches by name.
+**Tabs your way.** Across the top or down the left (`⇧⌘S`). Pinned tabs keep their place: a link on one that leaves its site opens as a small Kensho window (Settings › Pinned tabs stay put). Idle tabs sleep after half an hour, unless you set them to Keep Awake or they hold music or a film paused. The last session comes back instantly. `⌘K` switches by name. `⌃Tab` steps through the row or through recent tabs (Settings › Tabs).
 
-**Spaces.** Up to nine sets of tabs in each window, each with its own name and icon. `⌘1` to `⌘9` switch spaces and `⌥1` to `⌥9` pick tabs (both changeable in Settings), and `⌥⌘←` / `⌥⌘→` step through them. Switch from the button after the traffic lights or with a two-finger swipe across the tabs. `⌘K` finds open tabs in every space.
+**Spaces.** Up to nine sets of tabs in each window, each with its own name and icon. `⌘1` to `⌘9` switch spaces and `⌥1` to `⌥9` pick tabs (both changeable in Settings), and `⌥⌘←` / `⌥⌘→` step through them. Switch from the button after the traffic lights or with a two-finger swipe across the tabs. `⌘K` finds open tabs in every space; `⌘T` lists only this space's. Coming from Arc, Bookmarks › ⋯ › Import Spaces from Arc brings your spaces and pinned tabs.
 
-**Side by side.** Drag a tab onto another tab or onto the page, or give it a shortcut in Settings › Shortcuts. A divider you can drag sets the width.
+**Split View.** Drag a tab onto another tab or onto the page, or give it a shortcut in Settings › Shortcuts. A divider you can drag sets the width.
 
 **Many at once.** `⌘`- or `⇧`-click several tabs to copy, bookmark as one folder, move or close them together. Ten or more tabs unopened for a week are offered for closing.
 
-**Windows.** `⌘N` opens another, each with its own tabs and spaces. Move a tab between windows from its menu or by dragging it out past the window's edge. Quit and reopen, and every window comes back; File › Reopen Closed Window returns the last one you closed.
+**Windows.** `⌘N` opens another, each with its own tabs and spaces. Move a tab between windows from its menu or by dragging it out past the window's edge. Quit and reopen, and every window comes back; File › Reopen Closed Window returns the last one you closed. Resizing shows the window's size in the corner.
 
 ## Room for the page.
 
 **Focus** (`⌃⌘S`). The tabs and the bar step aside and come back when you point at the edge.
+
+**Pull to reload.** Two fingers down on the trackpad at the top of a page, until the circle closes, then let go (Settings › Pull down to reload).
 
 **Reading mode** (`⇧⌘R`). Finds the article on any site, with themes and text size.
 
@@ -42,6 +44,8 @@ Type an address to go there, words to search (DuckDuckGo by default, changeable 
 **Translate Page** (`⇧⌘Y`, or the globe beside Settings). Uses Apple's translator, on your Mac. Right-click the globe to choose the language for a site.
 
 **Picture-in-picture** (`⇧⌘P`). Or on its own when you leave a tab playing video with sound (off in Settings › Tabs). Click a tab's speaker to mute it, or Mute in its menu to keep a whole site silent.
+
+**Save Video.** Right-click a video. One that streams in pieces (HLS) is joined into a single file in your downloads folder, in the quality you pick, and shows in the downloads list while it saves. Protected (DRM) and live videos are refused.
 
 **Hide anything** (`⇧⌘H`). Per site, and it stays hidden.
 
@@ -57,17 +61,19 @@ Type an address to go there, words to search (DuckDuckGo by default, changeable 
 
 **Copy Address** (`⇧⌘C`) strips tracking tags and click ids. Copy Original Address keeps them, and `⌥⇧⌘C` copies a Markdown link. Share sends a page as its link plus a card with its title, picture and address.
 
-**Passwords** are saved in the macOS keychain and offered under the field, never auto-filled. Sign-in dialogs of password-protected folders can remember theirs. Import from Chrome, Arc, Dia, Brave or Edge in one click.
+**Passwords** are saved in the macOS keychain and offered under the field, never auto-filled. A manager can take over instead: pick Bitwarden in Welcome or Settings › Passwords (macOS 15.4 or later), and its Chrome extension fills in sign-ins while Satori's own suggestions and save prompts switch off. Sign-in dialogs of password-protected folders can remember theirs. Welcome brings bookmarks and passwords over from Chrome, Arc, Dia, Helium, Brave, Edge, Opera, Comet, Atlas and other Chromium browsers in one tap; Safari's bookmarks come in as an HTML file.
 
 ## Made for the Mac.
 
-**Kensho.** Links from other apps open in a small window first, with the address on top and Open in Satori (`⌘O`) to keep the page. `⌘⌥N` opens an empty one from any app, and `⌘F` finds on its page. Settings › General turns it off.
+**Kensho.** Links from other apps open in a small window first, with the address on top, Open (`⌘O`) to keep the page and Close (`Esc`) to let it go. `⌘⌥N` opens an empty one from any app, and `⌘F` finds on its page. Settings › General turns it off.
 
-**Chrome extensions** run on WebKit's own extension engine (macOS 15.4 or later) and install from a Web Store link. Unpacked folders work for development.
+**Bitwarden** runs as a Chrome extension on WebKit's own extension engine (macOS 15.4 or later). It installs from Welcome or Settings › Passwords, after its signature is checked and you press Install on the list of what it may do. It reaches only what its manifest asks for, and an update that adds permissions or sites asks again. Other Chrome extensions install from a Chrome Web Store link (alpha: many work, not all).
 
 **Panels.** Bookmarks, history and downloads open as searchable one-keystroke panels. The downloads list clears itself after the time you choose. Light, dark, or the Mac's own appearance.
 
 **Develop menu**, when you want one (Settings › General): Web Inspector (also `F12`), JavaScript console, page source, empty caches, JavaScript off per tab.
+
+**Soundscapes.** Nine sounds, composed on your Mac as they play, so nothing is downloaded. Off by default; turn it on from the sounds button or View › Soundscapes. It fades out while a tab plays sound and comes back when the tab stops.
 
 **Local files** open from Finder or a path typed into the address bar. A web app stays one window.
 
@@ -77,11 +83,11 @@ No account, no sync, no telemetry.
 
 ### What stays on your Mac
 
-Passwords live in the login keychain as ordinary items tagged `Satori`. History, open tabs, bookmarks, downloads and hidden elements are files under `~/Library/Application Support/Satori/`. They are encrypted with AES-GCM under a key Satori keeps in your login keychain, so other apps and other accounts on the Mac can't read them. Site icons, reading-aloud positions, site colours and muted sites are filed under HMACs made with the same key, so a folder listing doesn't show where you have been. Private tabs add nothing to any of them, except what you hide in one: that is kept so it stays hidden next time, filed under an HMAC of the site's name rather than the name.
+Passwords Satori keeps live in the login keychain as ordinary items tagged `Satori`. A password manager you pick keeps its own vault instead. History, open tabs, bookmarks, downloads and hidden elements are files under `~/Library/Application Support/Satori/`. They are encrypted with AES-GCM under a key Satori keeps in your login keychain, so other apps and other accounts on the Mac can't read them. Site icons, reading-aloud positions, site colors and muted sites are filed under HMACs made with the same key, so a folder listing doesn't show where you have been. Private tabs add nothing to any of them, except what you hide in one: that is kept so it stays hidden next time, filed under an HMAC of the site's name rather than the name.
 
 ### What leaves your Mac
 
-The pages you ask for, their icons, and one small update check a day. Two things happen before you press Return. In a new tab, the address Satori is completing from your history starts loading. And a single word that isn't in the dictionary is looked up in DNS with .com added, to see whether that site exists. Search words are never sent before Return. Translation and summaries run on the Mac with Apple's frameworks. Picking a natural voice downloads its model from Hugging Face once (135 MB).
+The pages you ask for, their icons, and update checks: one about five seconds after each launch and then once a day. Two things happen before you press Return. In a new tab, the address Satori is completing from your history starts loading. And a single word that isn't in the dictionary is looked up in DNS with .com added, to see whether that site exists. Search words are never sent before Return. Translation and summaries run on the Mac with Apple's frameworks. Soundscapes are composed on the Mac and fetch nothing. Share downloads the page's chosen `og:image` from whatever host the page names (ephemeral session, no cookies) and writes the card to `$TMPDIR/Satori Share/<host>.png`; the file is not deleted, and for a normal tab its name contains the visited host (a private tab's is named `page`). Bitwarden comes from Google's Chrome Web Store update service, which gets the extension's ID and a Chrome version string. That happens when you open the install screen for Bitwarden, which downloads its package to read what it asks for; and again when you press Install. Installed store extensions are checked for updates at launch, at most every 20 hours, sending each ID and version. A password manager you pick talks to its own servers, which Satori does not control. Picking a natural voice downloads its model from Hugging Face once (135 MB). On a page that streams video, Satori reads the playlists the player asked for, without cookies, so the right-click menu can list the qualities. Save Video fetches the pieces from the hosts the playlist names, and sends the page's cookies and address only to the page's own site.
 
 ### Certificates
 
@@ -89,15 +95,19 @@ Many Russian sites, including Sber, Alfa-Bank, T-Bank and Gosuslugi, use certifi
 
 ## Install
 
-Requires macOS 14 or later.
+Requires macOS 15 or later on an Apple Silicon Mac (arm64; no Intel build). It starts on macOS 14, but some features may not work there.
 
-Download `Satori.dmg` from [Releases](https://github.com/tretten/satori/releases/latest) and drag `Satori.app` to Applications. Builds are signed with a Developer ID certificate and notarized, so they open with no Gatekeeper warnings.
+Download `Satori.dmg` from [Releases](https://github.com/tretten/satori/releases/latest) and drag `Satori.app` to Applications. Builds are signed with a Developer ID certificate and notarized, so there is no malware or unidentified-developer warning. macOS may ask you to confirm the first time you open the app.
 
-Updates arrive automatically via Sparkle: once a day the app checks for a newer build, verifies it is signed by tretten, and swaps it in for the next launch. Nothing restarts on its own.
+The first time it runs from `/Applications`, Satori adds itself to the Dock, once, and restarts the Dock to show it. Remove it like any other icon and it stays gone. A Dock still on macOS's untouched layout is left as it is: drag Satori in yourself.
+
+Updates arrive automatically via Sparkle: the app checks for a newer build shortly after launch and once a day, verifies it is signed with Satori's update key, and swaps it in for the next launch. Nothing restarts on its own.
 
 ## Build from source
 
-Requires Xcode 16 or later with the Swift 6 toolchain, on macOS 14 or later.
+The public [tretten/satori](https://github.com/tretten/satori) repository holds builds and releases only. The source lives in a private repository, so the steps below are for that checkout.
+
+Requires Xcode 26 with the Swift 6 toolchain, on an Apple Silicon Mac running macOS 14 or later. The build is arm64 only.
 
 ```bash
 swift build
@@ -108,7 +118,7 @@ swift build
 
 `./build.sh release dmg` also makes `Satori.dmg` / `Satori.zip` plus the Sparkle `appcast.xml`; `./build.sh release ship` additionally notarizes and staples. That step needs a Developer ID certificate and Apple credentials, so it only really does anything for tretten's own releases.
 
-The marketing version lives in `VERSION` (currently 0.10.5).
+The marketing version lives in `VERSION`.
 
 ## Tech notes
 
