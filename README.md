@@ -15,13 +15,13 @@
 
 ## One field. That's the whole address bar.
 
-Type an address to go there, words to search (DuckDuckGo by default, changeable in Settings › Search). Addresses complete from your own history and a built-in list of popular sites, and the page you are about to open starts loading while you type (see Privacy). Addresses in other alphabets show as written (пример.рф); lookalike spellings stay in xn-- form, so a fake can't pass for the real site. With the field empty and a link on the clipboard, **Open copied link** is offered as the first row; it opens links only, never a search.
+Type an address to go there, words to search (DuckDuckGo by default, changeable in Settings › Search). Type a site's key or name, press Tab, and the field searches that site: yt, gh, wiki, so, r, amz and mdn are built in, and Satori learns other sites' searches from the sites themselves (see Privacy). Addresses complete from your own history and a built-in list of popular sites, and the page you are about to open starts loading while you type (see Privacy). Addresses in other alphabets show as written (пример.рф); lookalike spellings stay in xn-- form, so a fake can't pass for the real site. With the field empty and a link on the clipboard, **Open copied link** is offered as the first row; it opens links only, never a search.
 
 **Site colors.** A top bar (or sidebar) wears each site's own color, remembered. A site you have been to opens in its color and develops out of it as it loads, and the window under the page wears it too. A ring around the tab's icon shows loading.
 
 ## Tabs, the way you work.
 
-**Tabs your way.** Across the top or down the left (`⇧⌘S`). Pinned tabs keep their place: a link on one that leaves its site opens as a small Kensho window (Settings › Pinned tabs stay put). Idle tabs sleep after half an hour, unless you set them to Keep Awake or they hold music or a film paused. The last session comes back instantly. `⌘K` switches by name. `⌃Tab` steps through the row or through recent tabs (Settings › Tabs).
+**Tabs your way.** Across the top or down the left (`⇧⌘S`). The sidebar folds to a rail of icons (⌥⌘S, or View › Collapse Sidebar). Pinned tabs keep their place: a link on one that leaves its site opens as a small Kensho window (Settings › Pinned tabs stay put). Idle tabs sleep after half an hour (ten minutes on battery or in Low Power Mode), unless you set them to Keep Awake or they hold music or a film paused. The last session comes back instantly. `⌘K` switches by name. `⌃Tab` steps through the row or through recent tabs (Settings › Tabs). A page that has not answered after about six seconds says what it waits for, with Stop and Reload.
 
 **Spaces.** Up to nine sets of tabs in each window, each with its own name and icon. `⌘1` to `⌘9` switch spaces and `⌥1` to `⌥9` pick tabs (both changeable in Settings), and `⌥⌘←` / `⌥⌘→` step through them. Switch from the button after the traffic lights or with a two-finger swipe across the tabs. `⌘K` finds open tabs in every space; `⌘T` lists only this space's. Coming from Arc, Bookmarks › ⋯ › Import Spaces from Arc brings your spaces and pinned tabs.
 
@@ -45,6 +45,8 @@ Type an address to go there, words to search (DuckDuckGo by default, changeable 
 
 **Picture-in-picture** (`⇧⌘P`). Or on its own when you leave a tab playing video with sound (off in Settings › Tabs). Click a tab's speaker to mute it, or Mute in its menu to keep a whole site silent.
 
+**Convert.** Select a distance, weight, temperature, volume, speed or a time with a zone ("5 miles", "350 F", "3 PM EST") and right-click. The menu shows the other system, or your local time. It is worked out on your Mac, and currency is not converted.
+
 **Save Video.** Right-click a video. One that streams in pieces (HLS) is joined into a single file in your downloads folder, in the quality you pick, and shows in the downloads list while it saves. Protected (DRM) and live videos are refused.
 
 **Hide anything** (`⇧⌘H`). Per site, and it stays hidden.
@@ -53,11 +55,11 @@ Type an address to go there, words to search (DuckDuckGo by default, changeable 
 
 ## Quiet by default.
 
-**Ads and trackers** are blocked at the network level, on by default and off per site. That also drops heavy scripts of no use to the reader and holds embedded YouTube players until you press play.
+**Ads and trackers** are blocked at the network level, on by default and off per site. That also drops heavy scripts of no use to the reader and holds embedded YouTube players until you press play. If a page still breaks after three quick reloads, Shield offers "Turn off here" for that site, with Undo. Not in private tabs.
 
 **Cookie banners** are answered "no" for you, except on the sites you exempt.
 
-**Private tabs** turn the whole window dark while they are in front.
+**Private tabs** turn the whole window dark while they are in front. Open in Normal Tab (Tabs menu, or right-click a tab) moves a page out of one.
 
 **Copy Address** (`⇧⌘C`) strips tracking tags and click ids. Copy Original Address keeps them, and `⌥⇧⌘C` copies a Markdown link. Share sends a page as its link plus a card with its title, picture and address.
 
@@ -65,7 +67,7 @@ Type an address to go there, words to search (DuckDuckGo by default, changeable 
 
 ## Made for the Mac.
 
-**Kensho.** Links from other apps open in a small window first, with the address on top, Open (`⌘O`) to keep the page and Close (`Esc`) to let it go. `⌘⌥N` opens an empty one from any app, and `⌘F` finds on its page. Settings › General turns it off.
+**Kensho.** Links from other apps open in a small window first, with the address on top, Open (`⌘O`) to keep the page and Close (`Esc`) to let it go. `⌘⌥N` opens an empty one from any app, and `⌘F` finds on its page. A chevron beside Open sends the window to another Space, or always opens that site's Kensho windows in one. Settings › General turns it off.
 
 **Bitwarden** runs as a Chrome extension on WebKit's own extension engine (macOS 15.4 or later). It installs from Welcome or Settings › Passwords, after its signature is checked and you press Install on the list of what it may do. It reaches only what its manifest asks for, and an update that adds permissions or sites asks again. Other Chrome extensions install from a Chrome Web Store link (alpha: many work, not all).
 
@@ -83,11 +85,13 @@ No account, no sync, no telemetry.
 
 ### What stays on your Mac
 
-Passwords Satori keeps live in the login keychain as ordinary items tagged `Satori`. A password manager you pick keeps its own vault instead. History, open tabs, bookmarks, downloads and hidden elements are files under `~/Library/Application Support/Satori/`. They are encrypted with AES-GCM under a key Satori keeps in your login keychain, so other apps and other accounts on the Mac can't read them. Site icons, reading-aloud positions, site colors and muted sites are filed under HMACs made with the same key, so a folder listing doesn't show where you have been. Private tabs add nothing to any of them, except what you hide in one: that is kept so it stays hidden next time, filed under an HMAC of the site's name rather than the name.
+Passwords Satori keeps live in the login keychain as ordinary items tagged `Satori`. A password manager you pick keeps its own vault instead. History, open tabs, bookmarks, downloads, hidden elements and the sites Satori has learned a search for are files under `~/Library/Application Support/Satori/`. They are encrypted with AES-GCM under a key Satori keeps in your login keychain, so other apps and other accounts on the Mac can't read them. Site icons, reading-aloud positions, site colors, muted sites and Kensho's Space rules are filed under HMACs made with the same key, so a folder listing doesn't show where you have been. Private tabs add nothing to any of them, except what you hide in one: that is kept so it stays hidden next time, filed under an HMAC of the site's name rather than the name.
+
+Search history by page text is off until you switch it on in Settings › Privacy. Then, for each page you read for a few seconds, Satori keeps its title, description and about the first 300 words (2 KB at most), with a short list of numbers that stands for its meaning, for the latest 2,000 pages. That is one file, `pages.json`, sealed with the same key as your history. It is read only on your Mac: nothing is sent anywhere, and extensions can't search it. It is kept only on power, never in Low Power Mode, and the meaning numbers are worked out only when the Mac has been idle for a minute. It is skipped in private tabs, Kensho windows and web apps, on pages with a password field, on sites you have a saved password for, on search results, and on mail, bank, health, account and sign-in hosts. Clear History, deleting a row, or turning the switch off deletes it. Search by meaning works in English and German only.
 
 ### What leaves your Mac
 
-The pages you ask for, their icons, and update checks: one about five seconds after each launch and then once a day. Two things happen before you press Return. In a new tab, the address Satori is completing from your history starts loading. And a single word that isn't in the dictionary is looked up in DNS with .com added, to see whether that site exists. Search words are never sent before Return. Translation and summaries run on the Mac with Apple's frameworks. Soundscapes are composed on the Mac and fetch nothing. Share downloads the page's chosen `og:image` from whatever host the page names (ephemeral session, no cookies) and writes the card to `$TMPDIR/Satori Share/<host>.png`; the file is not deleted, and for a normal tab its name contains the visited host (a private tab's is named `page`). Bitwarden comes from Google's Chrome Web Store update service, which gets the extension's ID and a Chrome version string. That happens when you open the install screen for Bitwarden, which downloads its package to read what it asks for; and again when you press Install. Installed store extensions are checked for updates at launch, at most every 20 hours, sending each ID and version. A password manager you pick talks to its own servers, which Satori does not control. Picking a natural voice downloads its model from Hugging Face once (135 MB). On a page that streams video, Satori reads the playlists the player asked for, without cookies, so the right-click menu can list the qualities. Save Video fetches the pieces from the hosts the playlist names, and sends the page's cookies and address only to the page's own site.
+The pages you ask for, their icons, and update checks: one about five seconds after each launch and then once a day. On a page in a normal tab from a site Satori has not learned yet, Satori also asks that site for the search description its page links to (an OpenSearch file): over https, on the same site, without cookies, once per site each launch, and files over 64 KB are ignored. Private tabs never ask. Two things happen before you press Return. In a new tab, the address Satori is completing from your history starts loading. And a single word that isn't in the dictionary is looked up in DNS with .com added, to see whether that site exists. Search words are never sent before Return. Translation and summaries run on the Mac with Apple's frameworks. Soundscapes are composed on the Mac and fetch nothing. Share downloads the page's chosen `og:image` from whatever host the page names (ephemeral session, no cookies) and writes the card to `$TMPDIR/Satori Share/<host>.png`; the file is not deleted, and for a normal tab its name contains the visited host (a private tab's is named `page`). Bitwarden comes from Google's Chrome Web Store update service, which gets the extension's ID and a Chrome version string. That happens when you open the install screen for Bitwarden, which downloads its package to read what it asks for; and again when you press Install. Installed store extensions are checked for updates at launch, at most every 20 hours, sending each ID and version. A password manager you pick talks to its own servers, which Satori does not control. Picking a natural voice downloads its model from Hugging Face once (135 MB). On a page that streams video, Satori reads the playlists the player asked for, without cookies, so the right-click menu can list the qualities. Save Video fetches the pieces from the hosts the playlist names, and sends the page's cookies and address only to the page's own site.
 
 ### Certificates
 
