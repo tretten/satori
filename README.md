@@ -43,6 +43,8 @@ Type an address to go there, words to search (DuckDuckGo by default, changeable 
 
 **Translate Page** (`⇧⌘Y`, or the globe beside Settings). Uses Apple's translator, on your Mac. Right-click the globe to choose the language for a site.
 
+**Translate Selection.** Select words and right-click for Translate Selection: a small card beside them shows the translation, in the language Translate Page uses for the site, with Copy. It runs on your Mac too.
+
 **Picture-in-picture** (`⇧⌘P`). Or on its own when you leave a tab playing video with sound (off in Settings › Tabs). Click a tab's speaker to mute it, or Mute in its menu to keep a whole site silent.
 
 **Convert.** Select a distance, weight, temperature, volume, speed or a time with a zone ("5 miles", "350 F", "3 PM EST") and right-click. The menu shows the other system, or your local time. It is worked out on your Mac, and currency is not converted.
