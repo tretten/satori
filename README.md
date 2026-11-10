@@ -107,7 +107,7 @@ Download `Satori.dmg` from [Releases](https://github.com/tretten/satori/releases
 
 The first time it runs from `/Applications`, Satori adds itself to the Dock, once, and restarts the Dock to show it. Remove it like any other icon and it stays gone. A Dock still on macOS's untouched layout is left as it is: drag Satori in yourself.
 
-Updates arrive automatically via Sparkle: the app checks for a newer build shortly after launch and once a day, verifies it is signed with Satori's update key, and swaps it in for the next launch. Nothing restarts on its own.
+Updates arrive automatically via Sparkle: the app checks for a newer build shortly after launch and once a day, verifies it is signed with Satori's update key, and swaps it in for the next launch. Nothing restarts on its own. Only stable versions (0.14.0) are offered unless you turn on Settings › About › Get beta versions (0.13.5).
 
 ## Build from source
 
