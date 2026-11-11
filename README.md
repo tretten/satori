@@ -23,7 +23,7 @@ Type an address to go there, words to search (DuckDuckGo by default, changeable 
 
 **Tabs your way.** Across the top or down the left (`⇧⌘S`). The sidebar folds to a rail of icons (⌥⌘S, or View › Collapse Sidebar). Pinned tabs keep their place: a link on one that leaves its site opens as a small Kensho window (Settings › Pinned tabs stay put). A pin that has wandered shows an arrow that sends it back to the address it was pinned on (`⇧⌘D` pins and unpins). Idle tabs sleep after half an hour (ten minutes on battery or in Low Power Mode), unless you set them to Keep Awake or they hold music or a film paused. The last session comes back instantly. `⌘K` switches by name. `⌃Tab` steps through the row or through recent tabs (Settings › Tabs). A page that has not answered after about six seconds says what it waits for, with Stop and Reload.
 
-**Spaces.** Up to nine sets of tabs in each window, each with its own name and icon. `⌘1` to `⌘9` switch spaces and `⌥1` to `⌥9` pick tabs (both changeable in Settings), and `⌥⌘←` / `⌥⌘→` step through them. Switch from the button after the traffic lights or with a two-finger swipe across the tabs. `⌘K` finds open tabs in every space; `⌘T` lists only this space's. Coming from Arc, Bookmarks › ⋯ › Import Spaces from Arc brings your spaces and pinned tabs.
+**Spaces.** Up to nine sets of tabs in each window, each with its own name and icon. `⌘1` to `⌘9` switch spaces and `⌥1` to `⌥9` pick tabs (both changeable in Settings); with Settings › Shortcuts › Show tab numbers, holding the keys shows each tab's number, and `⌥⌘←` / `⌥⌘→` step through them. Switch from the button after the traffic lights or with a two-finger swipe across the tabs. `⌘K` finds open tabs in every space; `⌘T` lists only this space's. Coming from Arc, Bookmarks › ⋯ › Import Spaces from Arc brings your spaces and pinned tabs.
 
 **Split View.** Drag a tab onto another tab or onto the page, or give it a shortcut in Settings › Shortcuts. A divider you can drag sets the width.
 
@@ -53,7 +53,7 @@ Type an address to go there, words to search (DuckDuckGo by default, changeable 
 
 **Save Video.** Right-click a video. One that streams in pieces (HLS) is joined into a single file in your downloads folder, in the quality you pick, and shows in the downloads list while it saves. Protected (DRM) and live videos are refused. **Download and Play** takes the same quality choice, keeps the file in a temporary folder, and opens it in a tab when it is ready.
 
-**Satori Player.** YouTube, RUTUBE, Bilibili, Twitch recorded videos and Vimeo open on a page of their own, with the site's own player and no recommendations or comments, starting where you were. Settings › Video sites sets whether this happens: Ask (the default), Always or Never. The player page has a "Watch on <site>" link to the same video on its site. Some videos don't allow embedding.
+**Satori Player.** YouTube, RUTUBE, Bilibili, Twitch recorded videos and Vimeo open on a page of their own, with the site's own player and no recommendations or comments, starting where you were. Shorts play upright. Settings › Video sites sets whether this happens: Ask (the default), Always or Never; with Always, a click on a video's link goes straight to the player. The player page has a "Watch on <site>" link to the same video on its site. Some videos don't allow embedding.
 
 **Hide anything** (`⇧⌘H`). Per site, and it stays hidden.
 
